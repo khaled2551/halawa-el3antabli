@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { supabase, uploadProductImage, deleteProductImage } from '../supabaseClient';
 import { computePinHash } from './AdminAuthGuard';
-import { isDiscountActive } from '../data/defaultProducts';
+import { isDiscountActive, isProductDiscountTimeValid, calculateProductDiscount } from '../data/defaultProducts';
 
 export default function AdminDashboard({
   storeSettings,
@@ -49,6 +49,7 @@ export default function AdminDashboard({
   onDeleteProduct,
   onToggleStock,
   onAddNewProduct,
+  onBatchUpdateProducts,
   categories = [],
   onAddCategory,
   onUpdateCategory,
@@ -66,14 +67,21 @@ export default function AdminDashboard({
   const [editCatName, setEditCatName] = useState('');
   const [editCatSlug, setEditCatSlug] = useState('');
 
-  // Store-wide Promotion & Discount State
-  const [discountEnabled, setDiscountEnabled] = useState(Boolean(storeSettings?.discount_enabled));
-  const [discountPercent, setDiscountPercent] = useState(storeSettings?.discount_percent ?? 10);
-  const [discountTitle, setDiscountTitle] = useState(storeSettings?.discount_title || 'خصم خاص على جميع اللحوم البلدي');
-  const [discountStartDate, setDiscountStartDate] = useState(storeSettings?.discount_start_date || '');
-  const [discountEndDate, setDiscountEndDate] = useState(storeSettings?.discount_end_date || '');
-  const [discountTargetCategory, setDiscountTargetCategory] = useState(storeSettings?.discount_target_category || 'all');
-  const [discountSavedMessage, setDiscountSavedMessage] = useState(false);
+  // Per-Product Discount Management State
+  const [selectedDiscountProdIds, setSelectedDiscountProdIds] = useState([]);
+  const [discountProdSearch, setDiscountProdSearch] = useState('');
+  const [discountCatFilter, setDiscountCatFilter] = useState('all');
+  const [batchDiscountPercent, setBatchDiscountPercent] = useState(10);
+  const [batchDiscountStartDate, setBatchDiscountStartDate] = useState('');
+  const [batchDiscountEndDate, setBatchDiscountEndDate] = useState('');
+  const [isApplyingDiscounts, setIsApplyingDiscounts] = useState(false);
+  const [discountActionFeedback, setDiscountActionFeedback] = useState(null);
+
+  // Edit Product Modal Discount State
+  const [editProdDiscountEnabled, setEditProdDiscountEnabled] = useState(false);
+  const [editProdDiscountPercent, setEditProdDiscountPercent] = useState(10);
+  const [editProdDiscountStartDate, setEditProdDiscountStartDate] = useState('');
+  const [editProdDiscountEndDate, setEditProdDiscountEndDate] = useState('');
   
   // Settings Form State
   const [whatsappNumber, setWhatsappNumber] = useState(storeSettings?.whatsapp_number || '201000000000');
@@ -227,31 +235,174 @@ export default function AdminDashboard({
     }
   };
 
-  // Handle Save Store-wide Discounts
-  const handleSaveDiscounts = async (e) => {
+  // Per-Product Discount Actions
+  const handleToggleSelectProduct = (productId) => {
+    setSelectedDiscountProdIds((prev) =>
+      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
+    );
+  };
+
+  const handleSelectAllFiltered = (filteredList) => {
+    const ids = filteredList.map((p) => p.id);
+    setSelectedDiscountProdIds(ids);
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedDiscountProdIds([]);
+  };
+
+  // Apply discount to selected individual products
+  const handleApplyDiscountToSelected = async (e) => {
     if (e) e.preventDefault();
+    if (selectedDiscountProdIds.length === 0) {
+      alert('يرجى تحديد منتج واحد على الأقل من القائمة لتطبيق الخصم عليه.');
+      return;
+    }
+
+    const pct = Number(batchDiscountPercent);
+    if (!pct || pct <= 0 || pct > 90) {
+      alert('يرجى إدخال نسبة خصم صحيحة بين 1% و 90%');
+      return;
+    }
+
+    setIsApplyingDiscounts(true);
+    try {
+      const updatedProducts = products
+        .filter((p) => selectedDiscountProdIds.includes(p.id))
+        .map((p) => ({
+          ...p,
+          discount_percent: pct,
+          discount_start_date: batchDiscountStartDate || null,
+          discount_end_date: batchDiscountEndDate || null
+        }));
+
+      if (onBatchUpdateProducts) {
+        onBatchUpdateProducts(updatedProducts);
+      }
+
+      // Sync each updated product with Supabase
+      try {
+        await Promise.all(
+          updatedProducts.map((p) =>
+            supabase
+              .from('products')
+              .update({
+                discount_percent: pct,
+                discount_start_date: batchDiscountStartDate || null,
+                discount_end_date: batchDiscountEndDate || null
+              })
+              .eq('id', p.id)
+          )
+        );
+      } catch (sbErr) {
+        console.warn('Batch discount supabase sync notice:', sbErr);
+      }
+
+      setSelectedDiscountProdIds([]);
+      setDiscountActionFeedback({
+        type: 'success',
+        text: `تم بنجاح تطبيق خصم ${pct}% على (${updatedProducts.length}) صنف من اللحوم!`
+      });
+      setTimeout(() => setDiscountActionFeedback(null), 4000);
+    } catch (err) {
+      console.error('Error applying batch discount:', err);
+      alert('حدث خطأ أثناء تطبيق الخصم: ' + (err.message || ''));
+    } finally {
+      setIsApplyingDiscounts(false);
+    }
+  };
+
+  // Remove discount from single product
+  const handleRemoveDiscountFromProduct = async (productId) => {
+    const targetProd = products.find((p) => p.id === productId);
+    if (!targetProd) return;
+
     const updated = {
-      discount_enabled: discountEnabled,
-      discount_percent: Number(discountPercent),
-      discount_title: discountTitle.trim(),
-      discount_target_category: discountTargetCategory,
-      discount_start_date: discountStartDate || null,
-      discount_end_date: discountEndDate || null
+      ...targetProd,
+      discount_percent: null,
+      discount_start_date: null,
+      discount_end_date: null
     };
 
-    onUpdateSettings(updated);
+    if (onBatchUpdateProducts) {
+      onBatchUpdateProducts([updated]);
+    } else if (onUpdateFullProduct) {
+      onUpdateFullProduct(productId, {
+        discount_percent: null,
+        discount_start_date: null,
+        discount_end_date: null
+      });
+    }
 
     try {
       await supabase
-        .from('store_settings')
-        .update(updated)
-        .eq('id', 'main_config');
+        .from('products')
+        .update({
+          discount_percent: null,
+          discount_start_date: null,
+          discount_end_date: null
+        })
+        .eq('id', productId);
     } catch (err) {
-      console.warn('Supabase discount settings sync:', err);
+      console.warn('Remove discount supabase notice:', err);
     }
 
-    setDiscountSavedMessage(true);
-    setTimeout(() => setDiscountSavedMessage(false), 3000);
+    setDiscountActionFeedback({
+      type: 'info',
+      text: `تم إلغاء الخصم عن صنف "${targetProd.name}" وعاد لسعره الأصلي.`
+    });
+    setTimeout(() => setDiscountActionFeedback(null), 3500);
+  };
+
+  // Remove discount from all products
+  const handleRemoveAllProductDiscounts = async () => {
+    const discounted = products.filter((p) => p.discount_percent && Number(p.discount_percent) > 0);
+    if (discounted.length === 0) return;
+
+    if (!window.confirm(`هل أنت متأكد من إلغاء الخصومات عن كافة الأصناف (${discounted.length} صنف)؟`)) {
+      return;
+    }
+
+    setIsApplyingDiscounts(true);
+    try {
+      const resetProds = discounted.map((p) => ({
+        ...p,
+        discount_percent: null,
+        discount_start_date: null,
+        discount_end_date: null
+      }));
+
+      if (onBatchUpdateProducts) {
+        onBatchUpdateProducts(resetProds);
+      }
+
+      try {
+        await Promise.all(
+          resetProds.map((p) =>
+            supabase
+              .from('products')
+              .update({
+                discount_percent: null,
+                discount_start_date: null,
+                discount_end_date: null
+              })
+              .eq('id', p.id)
+          )
+        );
+      } catch (sbErr) {
+        console.warn('Reset all discounts Supabase notice:', sbErr);
+      }
+
+      setDiscountActionFeedback({
+        type: 'info',
+        text: `تم إلغاء الخصومات عن جميع الأصناف بنجاح.`
+      });
+      setTimeout(() => setDiscountActionFeedback(null), 4000);
+    } catch (err) {
+      console.error('Error removing all discounts:', err);
+    } finally {
+      setIsApplyingDiscounts(false);
+    }
   };
 
   // Handle Add Category Submit
@@ -484,6 +635,13 @@ export default function AdminDashboard({
     setEditProdImage(cleanImg);
     setEditProdImageFile(null);
     setEditProdImagePreview(cleanImg || null);
+
+    // Product-specific discount state
+    const hasDiscount = Boolean(product.discount_percent && Number(product.discount_percent) > 0);
+    setEditProdDiscountEnabled(hasDiscount);
+    setEditProdDiscountPercent(product.discount_percent || 10);
+    setEditProdDiscountStartDate(product.discount_start_date || '');
+    setEditProdDiscountEndDate(product.discount_end_date || '');
   };
 
   // Remove Image from Edit Modal
@@ -520,7 +678,10 @@ export default function AdminDashboard({
         price_per_kg: Number(editProdPrice),
         category: editProdCategory,
         image_url: finalImageUrl,
-        description: editProdDesc.trim() || ''
+        description: editProdDesc.trim() || '',
+        discount_percent: editProdDiscountEnabled ? Number(editProdDiscountPercent) : null,
+        discount_start_date: (editProdDiscountEnabled && editProdDiscountStartDate) ? editProdDiscountStartDate : null,
+        discount_end_date: (editProdDiscountEnabled && editProdDiscountEndDate) ? editProdDiscountEndDate : null
       };
 
       if (onUpdateFullProduct) {
@@ -640,6 +801,23 @@ export default function AdminDashboard({
     );
   });
 
+  // Active Discounted Products
+  const activeDiscountedProducts = products.filter(
+    (p) => p.discount_percent && Number(p.discount_percent) > 0
+  );
+
+  // Filtered Products for Discount Picker
+  const discountPickerFilteredProducts = products.filter((p) => {
+    const matchesCat = discountCatFilter === 'all' || p.category === discountCatFilter;
+    const q = discountProdSearch.toLowerCase().trim();
+    const matchesQ =
+      !q ||
+      p.name.toLowerCase().includes(q) ||
+      (p.english_name && p.english_name.toLowerCase().includes(q)) ||
+      (p.description && p.description.toLowerCase().includes(q));
+    return matchesCat && matchesQ;
+  });
+
   return (
     <div className="admin-standalone-wrapper">
       {/* Top Admin Navigation Bar */}
@@ -703,7 +881,7 @@ export default function AdminDashboard({
             onClick={() => setActiveTab('discounts')}
           >
             <Percent size={17} aria-hidden="true" />
-            <span>العروض وفترة الخصم</span>
+            <span>عروض وخصومات المنتجات ({activeDiscountedProducts.length})</span>
           </button>
 
           <button
@@ -832,9 +1010,16 @@ export default function AdminDashboard({
                           <span className="admin-item-en" lang="en">{p.english_name}</span>
                         )}
                       </div>
-                      {p.badge && (
+                      {p.discount_percent && Number(p.discount_percent) > 0 ? (
+                        <div className="admin-row-discount-indicator">
+                          <span className="discount-pill tabular-nums">خصم {p.discount_percent}%</span>
+                          <span className="discounted-price-label tabular-nums">
+                            (السعر المخفض: {Math.round(currentPrice * (1 - p.discount_percent / 100))} ج.م بدلاً من {currentPrice} ج.م)
+                          </span>
+                        </div>
+                      ) : p.badge ? (
                         <span className="admin-badge-indicator">{p.badge}</span>
-                      )}
+                      ) : null}
                     </div>
 
                     {/* Stock Status Switch */}
@@ -993,208 +1178,308 @@ export default function AdminDashboard({
           </section>
         )}
 
-        {/* TAB 3: DISCOUNTS & PROMOTIONS MANAGEMENT */}
+        {/* TAB 3: PRODUCT DISCOUNTS & PROMOTIONS MANAGEMENT */}
         {activeTab === 'discounts' && (
           <section className="admin-tab-pane" aria-labelledby="discounts-mgmt-heading">
-            <form className="admin-clean-form" onSubmit={handleSaveDiscounts}>
-              <div className="form-legend">
-                <h2 id="discounts-mgmt-heading" className="pane-heading">إدارة عروض وتخفيضات أسعار المنتجات</h2>
-                <p className="pane-subheading">تفعيل نسبة خصم تطبق مباشرة على أسعار أصناف اللحوم مع شطب السعر القديم وتحديد فترة سريان العرض.</p>
+            <div className="pane-header-row">
+              <div>
+                <h2 id="discounts-mgmt-heading" className="pane-heading">إدارة عروض وتخفيضات المنتجات</h2>
+                <p className="pane-subheading">
+                  حدد أي منتجات أو قطعيات لتطبيق خصم مباشر عليها وتحديد فترة سريان العرض، أو ألغِ الخصومات بضغطة واحدة.
+                </p>
               </div>
 
-              {/* Toggle Switch */}
-              <div className="admin-hero-control-card discount-control-card">
-                <div className="hero-control-header">
-                  <div className="hero-control-meta">
-                    <div className="hero-icon-title">
-                      <Percent size={22} className="gold-accent-icon" aria-hidden="true" />
-                      <h3 className="hero-control-heading">حالة تفعيل الخصم المباشر على المنتجات</h3>
-                    </div>
-                    <p className="hero-control-desc">
-                      عند التفعيل، يتم شطب السعر القديم وعرض السعر المخفض الجديد مع شارة الخصم مباشرة على كل صنف في واجهة المتجر.
-                    </p>
-                  </div>
+              {activeDiscountedProducts.length > 0 && (
+                <button
+                  type="button"
+                  className="danger-outline-action-btn"
+                  onClick={handleRemoveAllProductDiscounts}
+                  disabled={isApplyingDiscounts}
+                >
+                  <Trash2 size={15} aria-hidden="true" />
+                  <span>إلغاء الخصم عن كافة الأصناف ({activeDiscountedProducts.length})</span>
+                </button>
+              )}
+            </div>
 
-                  <div className="hero-toggle-area">
-                    <label className="hero-toggle-pill" htmlFor="discount-enabled-switch">
-                      <input
-                        id="discount-enabled-switch"
-                        type="checkbox"
-                        className="hero-switch-input"
-                        checked={discountEnabled}
-                        onChange={(e) => setDiscountEnabled(e.target.checked)}
-                      />
-                      <span className="hero-toggle-indicator">
-                        {discountEnabled ? (
-                          <>
-                            <CheckCircle2 size={15} aria-hidden="true" />
-                            <span>الخصم مفعّل</span>
-                          </>
-                        ) : (
-                          <>
-                            <EyeOff size={15} aria-hidden="true" />
-                            <span>الخصم معطل</span>
-                          </>
-                        )}
-                      </span>
-                    </label>
-                  </div>
+            {/* Top Feedback Banner if any */}
+            {discountActionFeedback && (
+              <div 
+                className={`admin-action-alert-strip ${discountActionFeedback.type === 'success' ? 'success' : 'info'}`}
+                role="status" 
+                aria-live="polite"
+              >
+                <CheckCircle2 size={18} aria-hidden="true" />
+                <span>{discountActionFeedback.text}</span>
+              </div>
+            )}
+
+            {/* SECTION 1: CURRENTLY DISCOUNTED PRODUCTS */}
+            <div className="admin-section-block">
+              <div className="section-block-title-row">
+                <div className="section-title-wrap">
+                  <Tag size={18} className="gold-accent-icon" aria-hidden="true" />
+                  <h3 className="section-block-title">الأصناف التي عليها خصم حالياً ({activeDiscountedProducts.length})</h3>
                 </div>
-
-                {/* Live Status indicator */}
-                <div className="discount-live-banner-preview">
-                  {discountEnabled ? (
-                    isDiscountActive({
-                      discount_enabled: true,
-                      discount_start_date: discountStartDate,
-                      discount_end_date: discountEndDate
-                    }) ? (
-                      <div className="status-badge-inline active">
-                        <CheckCircle2 size={16} aria-hidden="true" />
-                        <span>العرض نشط حالياً: أسعار الأصناف مخفضة الآن في المتجر</span>
-                      </div>
-                    ) : discountStartDate && new Date() < new Date(discountStartDate) ? (
-                      <div className="status-badge-inline scheduled">
-                        <Clock size={16} aria-hidden="true" />
-                        <span>العرض مجدول وسيبدأ تخفيض الأسعار في الموعد المحدد لاحقاً</span>
-                      </div>
-                    ) : (
-                      <div className="status-badge-inline expired">
-                        <AlertCircle size={16} aria-hidden="true" />
-                        <span>انتهت فترة سريان العرض وعادت الأصناف لأسعارها الأصلية تلقائياً</span>
-                      </div>
-                    )
-                  ) : (
-                    <div className="status-badge-inline disabled">
-                      <EyeOff size={16} aria-hidden="true" />
-                      <span>الخصم معطل حالياً (الأسعار العادية سارية)</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Sample product preview */}
-                {discountEnabled && (
-                  <div className="discount-product-preview-box">
-                    <span className="preview-label">معاينة شكل السعر أمام العميل في بطاقة الصنف:</span>
-                    <div className="preview-price-card">
-                      <span className="preview-prod-title">عرق فلتو صافي:</span>
-                      <span className="preview-old-price tabular-nums">1,050 ج.م</span>
-                      <span className="preview-new-price tabular-nums">
-                        {Math.round(1050 * (1 - (Number(discountPercent) || 10) / 100)).toLocaleString('ar-EG')} ج.م / كجم
-                      </span>
-                      <span className="preview-discount-tag">خصم {discountPercent}%</span>
-                    </div>
-                  </div>
-                )}
+                <span className="section-meta-hint">
+                  {activeDiscountedProducts.length === 0 
+                    ? 'لا توجد أصناف مخفضة حالياً' 
+                    : `ساري على ${activeDiscountedProducts.length} صنف من أصل ${products.length} صنف بالمتجر`}
+                </span>
               </div>
 
-              {/* Target Category Selector & Discount Percentage */}
-              <div className="form-two-cols">
-                <div className="form-group">
-                  <label htmlFor="admin-discount-target">تطبيق الخصم على:</label>
-                  <div className="input-with-icon">
-                    <FolderTree size={18} className="field-icon" aria-hidden="true" />
-                    <select
-                      id="admin-discount-target"
-                      value={discountTargetCategory}
-                      onChange={(e) => setDiscountTargetCategory(e.target.value)}
-                      className="modal-select-field"
-                    >
-                      <option value="all">جميع أصناف المتجر (كافة اللحوم)</option>
-                      {categories.filter(c => c.slug !== 'all').map((c) => (
-                        <option key={c.id || c.slug} value={c.slug}>
-                          قسم: {c.name} فقط
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <span className="field-hint">اختر ما إذا كان الخصم يشمل كافة اللحوم أو قسماً محدداً.</span>
+              {activeDiscountedProducts.length === 0 ? (
+                <div className="empty-sub-card">
+                  <AlertCircle size={28} className="empty-sub-icon" aria-hidden="true" />
+                  <p>لا توجد منتجات عليها خصم حالياً في المتجر. حدد الأصناف من القسم بالأسفل لتطبيق خصم فوري عليها.</p>
                 </div>
+              ) : (
+                <div className="discounted-items-grid">
+                  {activeDiscountedProducts.map((p) => {
+                    const basePrice = Number(p.price_per_kg);
+                    const pct = Number(p.discount_percent);
+                    const finalPrice = Math.round(basePrice * (1 - pct / 100));
+                    const isTimeValid = isProductDiscountTimeValid(p);
 
+                    return (
+                      <div key={p.id} className="discounted-item-card">
+                        <div className="disc-card-top">
+                          <div className="disc-card-info">
+                            <h4 className="disc-prod-title">{p.name}</h4>
+                            {p.english_name && <span className="disc-prod-en" lang="en">{p.english_name}</span>}
+                          </div>
+                          <span className="disc-pct-badge tabular-nums">خصم {pct}%</span>
+                        </div>
+
+                        <div className="disc-card-pricing-row">
+                          <span className="disc-old-price tabular-nums">{basePrice} ج.م</span>
+                          <span className="disc-arrow" aria-hidden="true">←</span>
+                          <span className="disc-new-price tabular-nums">{finalPrice} ج.م / كجم</span>
+                        </div>
+
+                        {/* Validity dates info */}
+                        <div className="disc-dates-row">
+                          <Calendar size={13} aria-hidden="true" />
+                          <span className="disc-dates-text">
+                            {p.discount_start_date || p.discount_end_date ? (
+                              <>
+                                {p.discount_start_date ? `من ${new Date(p.discount_start_date).toLocaleDateString('ar-EG')}` : 'فوري'}
+                                {p.discount_end_date ? ` إلى ${new Date(p.discount_end_date).toLocaleDateString('ar-EG')}` : ' (مستمر)'}
+                              </>
+                            ) : (
+                              'ساري مستمر حتى الإلغاء اليدوي'
+                            )}
+                          </span>
+                          {!isTimeValid && (
+                            <span className="disc-expired-tag">خارج وقت العرض</span>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          className="remove-single-disc-btn"
+                          onClick={() => handleRemoveDiscountFromProduct(p.id)}
+                          aria-label={`إلغاء الخصم عن ${p.name}`}
+                        >
+                          <X size={14} aria-hidden="true" />
+                          <span>إلغاء الخصم عن هذا الصنف</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* SECTION 2: APPLY DISCOUNT TO SPECIFIC PRODUCTS */}
+            <div className="admin-section-block highlight-section">
+              <div className="section-block-title-row">
+                <div className="section-title-wrap">
+                  <Percent size={18} className="gold-accent-icon" aria-hidden="true" />
+                  <h3 className="section-block-title">تطبيق خصم جديد على أصناف محددة</h3>
+                </div>
+                <span className="section-meta-hint">
+                  حدد نسبة الخصم وتاريخ السريان ثم اختر الأصناف التي ترغب بتخفيضها
+                </span>
+              </div>
+
+              {/* Discount Parameters Form */}
+              <div className="batch-discount-parameters-grid">
                 <div className="form-group">
-                  <label htmlFor="admin-discount-percent">نسبة الخصم المباشر على السعر (%): *</label>
+                  <label htmlFor="batch-discount-pct">نسبة الخصم المباشر (%): *</label>
                   <div className="input-with-icon">
                     <Percent size={18} className="field-icon" aria-hidden="true" />
                     <input
-                      id="admin-discount-percent"
+                      id="batch-discount-pct"
                       type="number"
                       min="1"
                       max="90"
-                      value={discountPercent}
-                      onChange={(e) => setDiscountPercent(e.target.value)}
+                      value={batchDiscountPercent}
+                      onChange={(e) => setBatchDiscountPercent(e.target.value)}
                       required
                       className="tabular-nums"
                     />
                   </div>
-                  <span className="field-hint">مثال: 10 يعني تخفيض 10% من سعر كل كيلو.</span>
-                </div>
-              </div>
-
-              {/* Discount Title */}
-              <div className="form-group">
-                <label htmlFor="admin-discount-title">عنوان أو شعار العرض (يظهر في الشريط الترويجي):</label>
-                <div className="input-with-icon">
-                  <Tag size={18} className="field-icon" aria-hidden="true" />
-                  <input
-                    id="admin-discount-title"
-                    type="text"
-                    value={discountTitle}
-                    onChange={(e) => setDiscountTitle(e.target.value)}
-                    placeholder="خصم خاص 10% على أسعار اللحوم البلدي"
-                  />
-                </div>
-              </div>
-
-              {/* Discount Time Range (Start Date & End Date) */}
-              <div className="form-two-cols">
-                <div className="form-group">
-                  <label htmlFor="admin-discount-start">
-                    تاريخ ووقت بدء الخصم:
-                    <span className="hint-text">(اتركه فارغاً ليبدأ الخصم فوراً)</span>
-                  </label>
-                  <div className="input-with-icon">
-                    <Calendar size={18} className="field-icon" aria-hidden="true" />
-                    <input
-                      id="admin-discount-start"
-                      type="datetime-local"
-                      value={discountStartDate}
-                      onChange={(e) => setDiscountStartDate(e.target.value)}
-                    />
-                  </div>
+                  <span className="field-hint">مثال: 10 يعني تخفيض 10% من سعر الكيلو لكل صنف محدد.</span>
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="admin-discount-end">
-                    تاريخ ووقت انتهاء الخصم:
-                    <span className="hint-text">(اتركه فارغاً ليستمر الخصم حتى إيقافه يدوياً)</span>
-                  </label>
+                  <label htmlFor="batch-discount-start">تاريخ ووقت بدء الخصم (اختياري):</label>
                   <div className="input-with-icon">
                     <Calendar size={18} className="field-icon" aria-hidden="true" />
                     <input
-                      id="admin-discount-end"
+                      id="batch-discount-start"
                       type="datetime-local"
-                      value={discountEndDate}
-                      onChange={(e) => setDiscountEndDate(e.target.value)}
+                      value={batchDiscountStartDate}
+                      onChange={(e) => setBatchDiscountStartDate(e.target.value)}
                     />
+                  </div>
+                  <span className="field-hint">اتركه فارغاً ليبدأ الخصم فوراً.</span>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="batch-discount-end">تاريخ ووقت انتهاء الخصم (اختياري):</label>
+                  <div className="input-with-icon">
+                    <Calendar size={18} className="field-icon" aria-hidden="true" />
+                    <input
+                      id="batch-discount-end"
+                      type="datetime-local"
+                      value={batchDiscountEndDate}
+                      onChange={(e) => setBatchDiscountEndDate(e.target.value)}
+                    />
+                  </div>
+                  <span className="field-hint">اتركه فارغاً ليستمر الخصم حتى تلغيه.</span>
+                </div>
+              </div>
+
+              {/* Product Filtering & Selection Controls */}
+              <div className="product-selector-toolbar">
+                <div className="selector-filters-row">
+                  <div className="input-with-icon selector-search">
+                    <Search size={16} className="field-icon" aria-hidden="true" />
+                    <input
+                      type="search"
+                      placeholder="ابحث بالاسم لتحديد القطعية (فلتو، ريش، كفتة، مفروم…)"
+                      value={discountProdSearch}
+                      onChange={(e) => setDiscountProdSearch(e.target.value)}
+                      aria-label="البحث في المنتجات لتحديدها"
+                    />
+                  </div>
+
+                  <select
+                    value={discountCatFilter}
+                    onChange={(e) => setDiscountCatFilter(e.target.value)}
+                    className="selector-category-select"
+                    aria-label="تصفية حسب القسم"
+                  >
+                    <option value="all">كافة الأقسام ({products.length} صنف)</option>
+                    {categories.filter(c => c.slug !== 'all').map((c) => (
+                      <option key={c.id || c.slug} value={c.slug}>
+                        {c.name} ({products.filter(p => p.category === c.slug).length})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="selector-actions-row">
+                  <button
+                    type="button"
+                    className="selector-pill-btn"
+                    onClick={() => handleSelectAllFiltered(discountPickerFilteredProducts)}
+                  >
+                    تحديد الكل المعروض ({discountPickerFilteredProducts.length})
+                  </button>
+
+                  <button
+                    type="button"
+                    className="selector-pill-btn secondary"
+                    onClick={handleDeselectAll}
+                    disabled={selectedDiscountProdIds.length === 0}
+                  >
+                    إلغاء التحديد
+                  </button>
+
+                  <div className="selected-count-tag tabular-nums">
+                    <span>المحدد حالياً:</span>
+                    <strong>{selectedDiscountProdIds.length}</strong>
+                    <span>صنف</span>
                   </div>
                 </div>
               </div>
 
-              {/* Submit Button */}
-              <div className="form-actions-bar">
-                <button type="submit" className="save-settings-btn">
-                  <Save size={18} aria-hidden="true" />
-                  <span>حفظ إعدادات وتاريخ الخصم</span>
-                </button>
+              {/* Product Checkboxes Cards Grid */}
+              <div className="selectable-products-grid">
+                {discountPickerFilteredProducts.map((p) => {
+                  const isSelected = selectedDiscountProdIds.includes(p.id);
+                  const basePrice = Number(p.price_per_kg);
+                  const pct = Number(batchDiscountPercent) || 10;
+                  const previewPrice = Math.round(basePrice * (1 - pct / 100));
+                  const alreadyHasDiscount = Boolean(p.discount_percent && Number(p.discount_percent) > 0);
 
-                {discountSavedMessage && (
-                  <span className="save-success-tag" role="status" aria-live="polite">
-                    <Check size={16} aria-hidden="true" />
-                    <span>تم حفظ إعدادات الخصم بنجاح!</span>
+                  return (
+                    <div
+                      key={p.id}
+                      className={`selectable-product-card ${isSelected ? 'selected' : ''}`}
+                      onClick={() => handleToggleSelectProduct(p.id)}
+                      role="checkbox"
+                      aria-checked={isSelected}
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === ' ' || e.key === 'Enter') {
+                          e.preventDefault();
+                          handleToggleSelectProduct(p.id);
+                        }
+                      }}
+                    >
+                      <div className="card-selection-check">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}} // handled by parent onClick
+                          tabIndex={-1}
+                          aria-label={`تحديد ${p.name}`}
+                        />
+                      </div>
+
+                      <div className="card-prod-meta">
+                        <div className="meta-name-row">
+                          <h4 className="meta-name">{p.name}</h4>
+                          {alreadyHasDiscount && (
+                            <span className="curr-disc-tag">خصم {p.discount_percent}% حالي</span>
+                          )}
+                        </div>
+                        <span className="meta-category">
+                          {categories.find(c => c.slug === p.category)?.name || p.category}
+                        </span>
+
+                        <div className="meta-pricing-calc tabular-nums">
+                          <span className="base-price">{basePrice} ج.م</span>
+                          <span className="preview-arrow">←</span>
+                          <span className="new-price">{previewPrice} ج.م</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Big CTA Button */}
+              <div className="apply-batch-cta-row">
+                <button
+                  type="button"
+                  className="apply-batch-discount-btn"
+                  onClick={handleApplyDiscountToSelected}
+                  disabled={selectedDiscountProdIds.length === 0 || isApplyingDiscounts}
+                >
+                  <Percent size={18} aria-hidden="true" />
+                  <span>
+                    {isApplyingDiscounts 
+                      ? 'جاري حفظ الخصم في Supabase…' 
+                      : `تطبيق خصم ${batchDiscountPercent}% على (${selectedDiscountProdIds.length}) صنف محدد الآن`}
                   </span>
-                )}
+                </button>
               </div>
-            </form>
+            </div>
           </section>
         )}
 
@@ -1996,6 +2281,80 @@ export default function AdminDashboard({
                       ))}
                     </select>
                   </div>
+                </div>
+
+                {/* PRODUCT-SPECIFIC DISCOUNT SECTION */}
+                <div className="admin-modal-discount-group">
+                  <div className="discount-group-header">
+                    <label className="checkbox-label-toggle" htmlFor="edit-prod-discount-toggle">
+                      <input
+                        id="edit-prod-discount-toggle"
+                        type="checkbox"
+                        checked={editProdDiscountEnabled}
+                        onChange={(e) => setEditProdDiscountEnabled(e.target.checked)}
+                      />
+                      <Percent size={15} className="gold-accent-icon" aria-hidden="true" />
+                      <span className="toggle-title">تفعيل خصم خاص على هذا الصنف تحديداً</span>
+                    </label>
+                  </div>
+
+                  {editProdDiscountEnabled && (
+                    <div className="discount-group-fields">
+                      <div className="form-group">
+                        <label htmlFor="edit-prod-discount-pct">نسبة الخصم (%): *</label>
+                        <div className="input-with-icon">
+                          <Percent size={16} className="field-icon" aria-hidden="true" />
+                          <input
+                            id="edit-prod-discount-pct"
+                            type="number"
+                            min="1"
+                            max="90"
+                            value={editProdDiscountPercent}
+                            onChange={(e) => setEditProdDiscountPercent(e.target.value)}
+                            required
+                            className="tabular-nums"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="modal-two-columns">
+                        <div className="form-group">
+                          <label htmlFor="edit-prod-discount-start">تاريخ ووقت بدء الخصم (اختياري):</label>
+                          <input
+                            id="edit-prod-discount-start"
+                            type="datetime-local"
+                            value={editProdDiscountStartDate}
+                            onChange={(e) => setEditProdDiscountStartDate(e.target.value)}
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label htmlFor="edit-prod-discount-end">تاريخ ووقت انتهاء الخصم (اختياري):</label>
+                          <input
+                            id="edit-prod-discount-end"
+                            type="datetime-local"
+                            value={editProdDiscountEndDate}
+                            onChange={(e) => setEditProdDiscountEndDate(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Live Price Calculation Preview */}
+                      {editProdPrice && (
+                        <div className="modal-discount-preview-row">
+                          <span className="preview-label">السعر بعد الخصم:</span>
+                          <span className="preview-original-slashed tabular-nums">{editProdPrice} ج.م</span>
+                          <span className="preview-arrow">←</span>
+                          <span className="preview-calc-price tabular-nums">
+                            {Math.round(Number(editProdPrice) * (1 - (Number(editProdDiscountPercent) || 0) / 100))} ج.م / كجم
+                          </span>
+                          <span className="preview-saving-badge tabular-nums">
+                            (توفير {Math.round(Number(editProdPrice) * ((Number(editProdDiscountPercent) || 0) / 100))} ج.م)
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* IMAGE UPLOAD & REMOVE SECTION */}

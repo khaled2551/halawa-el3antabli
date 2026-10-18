@@ -37,26 +37,27 @@ export const isDiscountActive = (settings) => {
   return true;
 };
 
-export const calculateProductDiscount = (product, settings) => {
+export const isProductDiscountTimeValid = (item) => {
+  if (!item) return false;
+  const now = Date.now();
+  if (item.discount_start_date) {
+    const start = new Date(item.discount_start_date).getTime();
+    if (!isNaN(start) && now < start) return false;
+  }
+  if (item.discount_end_date) {
+    const end = new Date(item.discount_end_date).getTime();
+    if (!isNaN(end) && now > end) return false;
+  }
+  return true;
+};
+
+export const calculateProductDiscount = (product) => {
   if (!product) return { originalPrice: 0, finalPrice: 0, discountPercent: 0, hasDiscount: false, discountTitle: '' };
 
   const basePrice = Number(product.price_per_kg) || 0;
 
-  // 1. Direct product sale price (e.g. sale_price: 480)
-  if (product.sale_price && Number(product.sale_price) > 0 && Number(product.sale_price) < basePrice) {
-    const sale = Number(product.sale_price);
-    const pct = Math.round(((basePrice - sale) / basePrice) * 100);
-    return {
-      originalPrice: basePrice,
-      finalPrice: sale,
-      discountPercent: pct,
-      hasDiscount: true,
-      discountTitle: 'سعر العرض'
-    };
-  }
-
-  // 2. Direct product individual discount percentage
-  if (product.discount_percent && Number(product.discount_percent) > 0) {
+  // 1. Direct product individual discount percentage with time validity check
+  if (product.discount_percent && Number(product.discount_percent) > 0 && isProductDiscountTimeValid(product)) {
     const pct = Number(product.discount_percent);
     const discounted = Math.round(basePrice * (1 - pct / 100));
     return {
@@ -64,26 +65,25 @@ export const calculateProductDiscount = (product, settings) => {
       finalPrice: discounted,
       discountPercent: pct,
       hasDiscount: true,
-      discountTitle: product.discount_title || `خصم ${pct}%`
+      discountTitle: product.discount_title || `خصم ${pct}%`,
+      discountStartDate: product.discount_start_date || null,
+      discountEndDate: product.discount_end_date || null
     };
   }
 
-  // 3. Storewide or Category-specific scheduled promotion
-  if (isDiscountActive(settings)) {
-    const targetCat = settings.discount_target_category;
-    if (!targetCat || targetCat === 'all' || targetCat === product.category) {
-      const pct = Number(settings.discount_percent) || 0;
-      if (pct > 0) {
-        const discounted = Math.round(basePrice * (1 - pct / 100));
-        return {
-          originalPrice: basePrice,
-          finalPrice: discounted,
-          discountPercent: pct,
-          hasDiscount: true,
-          discountTitle: settings.discount_title || `خصم ${pct}%`
-        };
-      }
-    }
+  // 2. Direct product sale price if set with time validity check
+  if (product.sale_price && Number(product.sale_price) > 0 && Number(product.sale_price) < basePrice && isProductDiscountTimeValid(product)) {
+    const sale = Number(product.sale_price);
+    const pct = Math.round(((basePrice - sale) / basePrice) * 100);
+    return {
+      originalPrice: basePrice,
+      finalPrice: sale,
+      discountPercent: pct,
+      hasDiscount: true,
+      discountTitle: 'سعر العرض',
+      discountStartDate: product.discount_start_date || null,
+      discountEndDate: product.discount_end_date || null
+    };
   }
 
   return {

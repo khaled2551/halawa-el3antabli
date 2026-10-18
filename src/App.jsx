@@ -206,13 +206,13 @@ export default function App() {
   // Compute dynamic product prices with discount applied directly on each cut
   const effectiveProducts = useMemo(() => {
     return products.map((prod) => {
-      const discountInfo = calculateProductDiscount(prod, storeSettings);
+      const discountInfo = calculateProductDiscount(prod);
       return {
         ...prod,
         ...discountInfo
       };
     });
-  }, [products, storeSettings]);
+  }, [products]);
 
   // Filter products by category and search query using effective discounted products
   const filteredProducts = effectiveProducts.filter((prod) => {
@@ -310,6 +310,17 @@ export default function App() {
       return updated;
     });
     supabase.from('products').delete().eq('id', productId).then();
+  };
+
+  const handleBatchUpdateProducts = (updatedProductsList) => {
+    setProducts((prev) => {
+      const map = new Map(updatedProductsList.map((p) => [p.id, p]));
+      const updated = prev.map((p) => (map.has(p.id) ? { ...p, ...map.get(p.id) } : p));
+      try {
+        localStorage.setItem('halawa_products', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
   };
 
   const handleUpdateSettings = (updated) => {
@@ -459,6 +470,7 @@ export default function App() {
         onDeleteProduct={handleDeleteProduct}
         onToggleStock={handleToggleStock}
         onAddNewProduct={handleAddNewProduct}
+        onBatchUpdateProducts={handleBatchUpdateProducts}
         categories={categories}
         onAddCategory={handleAddCategory}
         onUpdateCategory={handleUpdateCategory}
@@ -470,7 +482,7 @@ export default function App() {
   }
 
   // ROUTE 2: CUSTOMER STOREFRONT (/)
-  const hasActiveDiscount = isDiscountActive(storeSettings);
+  const discountedProductsCount = effectiveProducts.filter((p) => p.hasDiscount).length;
 
   return (
     <div className="app-container">
@@ -483,22 +495,17 @@ export default function App() {
 
       {/* Main Store Content */}
       <main className="store-main-content" role="main">
-        {/* Promotional Discount Notice Banner when active */}
-        {hasActiveDiscount && (
-          <aside className="storewide-promo-bar" aria-label="عرض خصم سارٍ">
+        {/* Promotional Discount Notice Banner when any products have active discounts */}
+        {discountedProductsCount > 0 && (
+          <aside className="storewide-promo-bar" aria-label="عروض وتخفيضات اللحوم">
             <div className="promo-bar-content">
               <span className="promo-pill">
                 <Percent size={14} aria-hidden="true" />
-                <span>خصم {storeSettings.discount_percent}%</span>
+                <span>عروض حلاوة العنتبلي</span>
               </span>
               <strong className="promo-title">
-                {storeSettings.discount_title || 'عرض خاص سارٍ على سلة المشتريات الآن!'}
+                تخفيضات خاصة سارية الآن مباشرة على {discountedProductsCount} من قطعيات اللحوم البلدية!
               </strong>
-              {storeSettings.discount_end_date && (
-                <span className="promo-expiry tabular-nums">
-                  (سارٍ حتى {new Date(storeSettings.discount_end_date).toLocaleDateString('ar-EG')})
-                </span>
-              )}
             </div>
           </aside>
         )}

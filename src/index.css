@@ -4137,3 +4137,571 @@ input::placeholder, textarea::placeholder {
   padding: 2px 8px;
   border-radius: var(--radius-full);
 }
+
+/* ========================================================
+   PRODUCT DISCOUNTS CONSOLE STYLES (ADMIN)
+   ======================================================== */
+.admin-action-alert-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  margin-bottom: 22px;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.admin-action-alert-strip.success {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+
+.admin-action-alert-strip.info {
+  background: rgba(212, 154, 61, 0.12);
+  border: 1px solid rgba(212, 154, 61, 0.35);
+  color: var(--brand-gold);
+}
+
+.admin-section-block {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  margin-bottom: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.admin-section-block.highlight-section {
+  border-color: rgba(212, 154, 61, 0.3);
+  background: linear-gradient(180deg, rgba(212, 154, 61, 0.03) 0%, var(--bg-surface) 100%);
+}
+
+.section-block-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.section-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-block-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.section-meta-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.empty-sub-card {
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.015);
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.empty-sub-icon {
+  color: var(--brand-gold);
+  opacity: 0.6;
+}
+
+/* Discounted Items Grid */
+.discounted-items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.discounted-item-card {
+  background: var(--bg-ground);
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.discounted-item-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(220, 38, 38, 0.6);
+}
+
+.disc-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.disc-card-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.disc-prod-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+}
+
+.disc-prod-en {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.disc-pct-badge {
+  background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 900;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.disc-card-pricing-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.disc-old-price {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: #ef4444;
+}
+
+.disc-arrow {
+  color: var(--brand-gold);
+  font-size: 0.85rem;
+}
+
+.disc-new-price {
+  font-size: 1.12rem;
+  font-weight: 900;
+  color: var(--brand-gold);
+}
+
+.disc-dates-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.73rem;
+  color: var(--text-muted);
+}
+
+.disc-expired-tag {
+  color: #f87171;
+  font-weight: 700;
+  margin-right: auto;
+}
+
+.remove-single-disc-btn {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #f87171;
+  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 6px;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.remove-single-disc-btn:hover {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ffffff;
+}
+
+/* Batch Discount Form Parameters */
+.batch-discount-parameters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  background: var(--bg-ground);
+  padding: 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+}
+
+/* Product Selector Toolbar */
+.product-selector-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.selector-filters-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .selector-filters-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.selector-search input {
+  padding-right: 36px;
+}
+
+.selector-category-select {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.selector-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.selector-pill-btn {
+  background: rgba(212, 154, 61, 0.12);
+  border: 1px solid rgba(212, 154, 61, 0.3);
+  color: var(--brand-gold);
+  border-radius: var(--radius-full);
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.selector-pill-btn:hover {
+  background: rgba(212, 154, 61, 0.22);
+}
+
+.selector-pill-btn.secondary {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
+}
+
+.selector-pill-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text-primary);
+}
+
+.selected-count-tag {
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.selected-count-tag strong {
+  color: var(--brand-gold);
+  font-size: 0.95rem;
+}
+
+/* Selectable Products Grid */
+.selectable-products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--bg-ground);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.selectable-product-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.selectable-product-card:hover {
+  border-color: rgba(212, 154, 61, 0.4);
+  background: var(--bg-surface-elevated);
+}
+
+.selectable-product-card.selected {
+  border-color: var(--brand-gold);
+  background: rgba(212, 154, 61, 0.08);
+}
+
+.card-selection-check {
+  display: flex;
+  align-items: center;
+  padding-top: 3px;
+}
+
+.card-selection-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--brand-gold);
+  cursor: pointer;
+}
+
+.card-prod-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.meta-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.meta-name {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.curr-disc-tag {
+  background: rgba(220, 38, 38, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.meta-category {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.meta-pricing-calc {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.meta-pricing-calc .base-price {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.meta-pricing-calc .preview-arrow {
+  font-size: 0.75rem;
+  color: var(--brand-gold);
+}
+
+.meta-pricing-calc .new-price {
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: var(--brand-gold);
+}
+
+/* Apply CTA Button */
+.apply-batch-cta-row {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 10px;
+}
+
+.apply-batch-discount-btn {
+  background: linear-gradient(135deg, var(--brand-gold) 0%, #b88628 100%);
+  color: #0b0c10;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 14px 28px;
+  font-size: 0.95rem;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 18px rgba(212, 154, 61, 0.3);
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+
+.apply-batch-discount-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+}
+
+.apply-batch-discount-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.danger-outline-action-btn {
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  color: #f87171;
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.danger-outline-action-btn:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.2);
+  color: #ffffff;
+}
+
+/* Admin Modal Product Discount Group */
+.admin-modal-discount-group {
+  background: var(--bg-ground);
+  border: 1px solid rgba(212, 154, 61, 0.3);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.discount-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.checkbox-label-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.checkbox-label-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--brand-gold);
+  cursor: pointer;
+}
+
+.discount-group-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.modal-discount-preview-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px dashed rgba(212, 154, 61, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  flex-wrap: wrap;
+}
+
+.preview-original-slashed {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: #ef4444;
+}
+
+.preview-calc-price {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: var(--brand-gold);
+}
+
+.preview-saving-badge {
+  font-size: 0.8rem;
+  color: #34d399;
+  font-weight: 700;
+}
+
+/* Product Row Discount Indicator in Tab 1 */
+.admin-row-discount-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.admin-row-discount-indicator .discount-pill {
+  background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%);
+  color: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+}
+
+.admin-row-discount-indicator .discounted-price-label {
+  font-size: 0.78rem;
+  color: var(--brand-gold);
+  font-weight: 700;
+}
+
