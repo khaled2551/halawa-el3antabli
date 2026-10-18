@@ -192,6 +192,34 @@ export default function AdminDashboard({
     } catch {}
   };
 
+  // Handle Instant Hero Banner Toggle
+  const handleToggleHeroBanner = async (newVal) => {
+    setShowHeroBanner(newVal);
+    onUpdateSettings({ show_hero_banner: newVal });
+    try {
+      await supabase
+        .from('store_settings')
+        .update({ show_hero_banner: newVal })
+        .eq('id', 'main_config');
+    } catch (err) {
+      console.warn('Hero banner toggle supabase sync:', err);
+    }
+  };
+
+  // Handle Instant Store Open/Closed Change
+  const handleStoreStatusChange = async (newVal) => {
+    setIsStoreOpen(newVal);
+    onUpdateSettings({ is_store_open: newVal });
+    try {
+      await supabase
+        .from('store_settings')
+        .update({ is_store_open: newVal })
+        .eq('id', 'main_config');
+    } catch (err) {
+      console.warn('Store status toggle supabase sync:', err);
+    }
+  };
+
   // Handle Save Settings
   const handleSaveSettings = async (e) => {
     e.preventDefault();
@@ -234,11 +262,26 @@ export default function AdminDashboard({
 
     onUpdateSettings(updated);
 
-    // Save to Supabase
+    // Save to Supabase (with fallback to core columns if new columns don't exist yet)
     try {
-      await supabase
+      const { error } = await supabase
         .from('store_settings')
         .upsert({ id: 'main_config', ...updated });
+
+      if (error) {
+        console.warn('Full settings upsert notice, using core fallback:', error.message);
+        const corePayload = {
+          id: 'main_config',
+          whatsapp_number: cleanNumber,
+          store_name: storeName.trim(),
+          slogan: slogan.trim(),
+          address: storeAddress.trim(),
+          delivery_fee: Number(deliveryFee),
+          announcement_banner: announcement.trim(),
+          is_store_open: isStoreOpen
+        };
+        await supabase.from('store_settings').upsert(corePayload);
+      }
     } catch (err) {
       console.warn('Settings supabase sync:', err);
     }
@@ -803,7 +846,7 @@ export default function AdminDashboard({
                         type="checkbox"
                         className="hero-switch-input"
                         checked={showHeroBanner}
-                        onChange={(e) => setShowHeroBanner(e.target.checked)}
+                        onChange={(e) => handleToggleHeroBanner(e.target.checked)}
                       />
                       <span className="hero-toggle-indicator">
                         {showHeroBanner ? (
@@ -906,7 +949,7 @@ export default function AdminDashboard({
                   <select
                     id="admin-store-status"
                     value={isStoreOpen ? 'open' : 'closed'}
-                    onChange={(e) => setIsStoreOpen(e.target.value === 'open')}
+                    onChange={(e) => handleStoreStatusChange(e.target.value === 'open')}
                   >
                     <option value="open">المتجر مفتوح ويستقبل الطلبات</option>
                     <option value="closed">المتجر مغلق مؤقتاً</option>

@@ -30,3 +30,6 @@ dist-ssr/
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# Scratch and temp files
+scratch/

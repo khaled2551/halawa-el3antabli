@@ -6,6 +6,7 @@ import ProductModal from './components/ProductModal';
 import CartDrawer from './components/CartDrawer';
 import AdminDashboard from './components/AdminDashboard';
 import AdminAuthGuard from './components/AdminAuthGuard';
+import PwaInstallBanner from './components/PwaInstallBanner';
 import { defaultStoreSettings, defaultCategories, defaultProducts } from './data/defaultProducts';
 import { supabase } from './supabaseClient';
 import { ShoppingBag, Search, MapPin } from 'lucide-react';
@@ -116,13 +117,25 @@ export default function App() {
           .maybeSingle();
 
         if (settingsData) {
-          setStoreSettings((prev) => ({
-            ...prev,
-            ...settingsData,
-            store_name: cleanEmoji(settingsData.store_name),
-            slogan: cleanEmoji(settingsData.slogan),
-            announcement_banner: cleanEmoji(settingsData.announcement_banner)
-          }));
+          setStoreSettings((prev) => {
+            const merged = {
+              ...prev,
+              ...settingsData,
+              store_name: cleanEmoji(settingsData.store_name || prev.store_name),
+              slogan: cleanEmoji(settingsData.slogan || prev.slogan),
+              announcement_banner: cleanEmoji(settingsData.announcement_banner || prev.announcement_banner),
+              show_hero_banner: typeof settingsData.show_hero_banner === 'boolean'
+                ? settingsData.show_hero_banner
+                : (typeof prev.show_hero_banner === 'boolean' ? prev.show_hero_banner : true),
+              hero_title: settingsData.hero_title || prev.hero_title,
+              hero_description: settingsData.hero_description || prev.hero_description,
+              maps_url: settingsData.maps_url || prev.maps_url
+            };
+            try {
+              localStorage.setItem('halawa_settings', JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
         }
 
         // 2. Fetch Categories (Sanitize names to ensure zero emojis)
@@ -480,6 +493,9 @@ export default function App() {
         onClearCart={handleClearCart}
         storeSettings={storeSettings}
       />
+
+      {/* PWA Mobile Installation Prompt Banner */}
+      <PwaInstallBanner hasCartItems={totalCartCount > 0} />
     </div>
   );
 }
