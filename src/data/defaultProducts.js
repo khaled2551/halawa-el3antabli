@@ -14,7 +14,8 @@ export const defaultStoreSettings = {
   hero_description: 'أصول الجزارة البلدي من قلب المذبح. ننتقي لك أنعم القطعيات الطازجة، ونجهزها بتقطيعك المفضل ونوصلها لباب بيتك مباشرة عبر الواتساب.',
   discount_enabled: false,
   discount_percent: 10,
-  discount_title: 'خصم خاص على جميع اللحوم البلدي',
+  discount_title: 'خصم خاص على أسعار اللحوم البلدي',
+  discount_target_category: 'all',
   discount_start_date: '',
   discount_end_date: ''
 };
@@ -34,6 +35,64 @@ export const isDiscountActive = (settings) => {
     if (!isNaN(end) && now > end) return false;
   }
   return true;
+};
+
+export const calculateProductDiscount = (product, settings) => {
+  if (!product) return { originalPrice: 0, finalPrice: 0, discountPercent: 0, hasDiscount: false, discountTitle: '' };
+
+  const basePrice = Number(product.price_per_kg) || 0;
+
+  // 1. Direct product sale price (e.g. sale_price: 480)
+  if (product.sale_price && Number(product.sale_price) > 0 && Number(product.sale_price) < basePrice) {
+    const sale = Number(product.sale_price);
+    const pct = Math.round(((basePrice - sale) / basePrice) * 100);
+    return {
+      originalPrice: basePrice,
+      finalPrice: sale,
+      discountPercent: pct,
+      hasDiscount: true,
+      discountTitle: 'سعر العرض'
+    };
+  }
+
+  // 2. Direct product individual discount percentage
+  if (product.discount_percent && Number(product.discount_percent) > 0) {
+    const pct = Number(product.discount_percent);
+    const discounted = Math.round(basePrice * (1 - pct / 100));
+    return {
+      originalPrice: basePrice,
+      finalPrice: discounted,
+      discountPercent: pct,
+      hasDiscount: true,
+      discountTitle: product.discount_title || `خصم ${pct}%`
+    };
+  }
+
+  // 3. Storewide or Category-specific scheduled promotion
+  if (isDiscountActive(settings)) {
+    const targetCat = settings.discount_target_category;
+    if (!targetCat || targetCat === 'all' || targetCat === product.category) {
+      const pct = Number(settings.discount_percent) || 0;
+      if (pct > 0) {
+        const discounted = Math.round(basePrice * (1 - pct / 100));
+        return {
+          originalPrice: basePrice,
+          finalPrice: discounted,
+          discountPercent: pct,
+          hasDiscount: true,
+          discountTitle: settings.discount_title || `خصم ${pct}%`
+        };
+      }
+    }
+  }
+
+  return {
+    originalPrice: basePrice,
+    finalPrice: basePrice,
+    discountPercent: 0,
+    hasDiscount: false,
+    discountTitle: ''
+  };
 };
 
 export const defaultCategories = [

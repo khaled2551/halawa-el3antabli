@@ -24,13 +24,17 @@ export default function CartDrawer({
 
   const [lastSubmitTimestamp, setLastSubmitTimestamp] = useState(0);
 
-  // Calculations with Active Discount
-  const subtotal = cartItems.reduce((acc, item) => acc + item.totalPrice, 0);
+  // Calculations with Product-level Discounts (Discount is on the products, not on the cart)
+  const subtotal = cartItems.reduce((acc, item) => acc + (Number(item.totalPrice) || 0), 0);
   const deliveryFee = deliveryType === 'pickup' ? 0 : Number(storeSettings?.delivery_fee || 0);
-  const discountActive = isDiscountActive(storeSettings);
-  const discountPercent = discountActive ? Number(storeSettings?.discount_percent || 0) : 0;
-  const discountAmount = discountActive ? Math.round(subtotal * (discountPercent / 100)) : 0;
-  const grandTotal = Math.max(0, subtotal - discountAmount + deliveryFee);
+  const totalSavings = cartItems.reduce((acc, item) => {
+    if (item.has_discount && item.original_price_per_kg && item.price_per_kg) {
+      const diff = Number(item.original_price_per_kg) - Number(item.price_per_kg);
+      return acc + (diff * (Number(item.weight) || 1));
+    }
+    return acc;
+  }, 0);
+  const grandTotal = Math.max(0, subtotal + deliveryFee);
 
   // Security & Validation
   const validate = () => {
@@ -117,9 +121,7 @@ export default function CartDrawer({
           ...dbOrderPayload,
           delivery_type: deliveryType,
           subtotal: subtotal,
-          discount_amount: discountAmount,
-          discount_percent: discountPercent,
-          discount_title: discountActive ? storeSettings?.discount_title : null,
+          total_savings: totalSavings,
           created_at: new Date().toISOString()
         };
         localOrders.unshift(localRecord);
@@ -171,14 +173,19 @@ export default function CartDrawer({
         if (item.cutStyle) message += `   - طريقة التقطيع: ${item.cutStyle}\n`;
         if (item.fatOption) message += `   - نسبة الدهن: ${item.fatOption}\n`;
         if (item.note) message += `   - ملاحظة: ${item.note}\n`;
-        message += `   - السعر: ${item.totalPrice.toLocaleString('ar-EG')} ج.م (${item.price_per_kg} ج.م/كجم)\n\n`;
+        if (item.has_discount && item.original_price_per_kg && item.original_price_per_kg > item.price_per_kg) {
+          const originalItemTotal = Math.round(item.original_price_per_kg * item.weight);
+          message += `   - السعر المخفض: *${item.totalPrice.toLocaleString('ar-EG')} ج.م* (بدلاً من ${originalItemTotal.toLocaleString('ar-EG')} ج.م - خصم ${item.discount_percent}%)\n\n`;
+        } else {
+          message += `   - السعر: ${item.totalPrice.toLocaleString('ar-EG')} ج.م (${item.price_per_kg} ج.م/كجم)\n\n`;
+        }
       });
 
       message += `──────────────────────────\n`;
       message += `*ملخص الحساب:*\n`;
       message += `• إجمالي قيمة اللحوم: ${subtotal.toLocaleString('ar-EG')} ج.م\n`;
-      if (discountActive && discountAmount > 0) {
-        message += `• خصم العرض (${storeSettings?.discount_title || 'عرض ترويجي'} - ${discountPercent}%): -${discountAmount.toLocaleString('ar-EG')} ج.م\n`;
+      if (totalSavings > 0) {
+        message += `• إجمالي التوفير من عروض اللحوم: ${Math.round(totalSavings).toLocaleString('ar-EG')} ج.م\n`;
       }
       if (deliveryType === 'pickup') {
         message += `• رسوم التوصيل: 0 ج.م (استلام من الفرع مجاناً)\n`;
@@ -273,9 +280,16 @@ export default function CartDrawer({
                       </div>
 
                       <div className="item-price-actions">
-                        <span className="item-price tabular-nums">
-                          {item.totalPrice.toLocaleString('ar-EG')} <small>ج.م</small>
-                        </span>
+                        <div className="item-price-col">
+                          {item.has_discount && item.original_price_per_kg && item.original_price_per_kg > item.price_per_kg && (
+                            <span className="cart-item-original-price tabular-nums">
+                              {Math.round(item.original_price_per_kg * item.weight).toLocaleString('ar-EG')} ج.م
+                            </span>
+                          )}
+                          <span className="item-price tabular-nums">
+                            {item.totalPrice.toLocaleString('ar-EG')} <small>ج.م</small>
+                          </span>
+                        </div>
                         <button
                           type="button"
                           className="item-remove-btn"
@@ -355,14 +369,14 @@ export default function CartDrawer({
                   <span>إجمالي قطعيات اللحوم:</span>
                   <span className="tabular-nums">{subtotal.toLocaleString('ar-EG')} ج.م</span>
                 </div>
-                {discountActive && discountAmount > 0 && (
+                {totalSavings > 0 && (
                   <div className="breakdown-row discount-applied-row">
                     <span className="discount-applied-label">
                       <Percent size={13} aria-hidden="true" />
-                      <span>خصم العرض ({discountPercent}%):</span>
+                      <span>إجمالي التوفير من عروض اللحوم:</span>
                     </span>
                     <span className="discount-applied-val tabular-nums">
-                      -{discountAmount.toLocaleString('ar-EG')} ج.م
+                      -{Math.round(totalSavings).toLocaleString('ar-EG')} ج.م
                     </span>
                   </div>
                 )}

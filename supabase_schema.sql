@@ -309,9 +309,14 @@ using (bucket_id = 'product-images');
 alter table public.store_settings 
 add column if not exists discount_enabled boolean default false,
 add column if not exists discount_percent numeric(5, 2) default 0,
-add column if not exists discount_title text default 'خصم خاص على جميع اللحوم البلدي',
+add column if not exists discount_title text default 'خصم خاص على أسعار اللحوم البلدي',
+add column if not exists discount_target_category text default 'all',
 add column if not exists discount_start_date timestamptz,
 add column if not exists discount_end_date timestamptz;
+
+alter table public.products
+add column if not exists sale_price numeric(10, 2),
+add column if not exists discount_percent numeric(5, 2);
 
 alter table public.orders
 add column if not exists delivery_type text default 'delivery';

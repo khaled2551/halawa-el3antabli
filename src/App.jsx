@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Header from './components/Header';
 import CategoryNav from './components/CategoryNav';
 import ProductCard from './components/ProductCard';
@@ -7,7 +7,13 @@ import CartDrawer from './components/CartDrawer';
 import AdminDashboard from './components/AdminDashboard';
 import AdminAuthGuard from './components/AdminAuthGuard';
 import PwaInstallBanner from './components/PwaInstallBanner';
-import { defaultStoreSettings, defaultCategories, defaultProducts, isDiscountActive } from './data/defaultProducts';
+import { 
+  defaultStoreSettings, 
+  defaultCategories, 
+  defaultProducts, 
+  isDiscountActive,
+  calculateProductDiscount 
+} from './data/defaultProducts';
 import { supabase } from './supabaseClient';
 import { ShoppingBag, Search, MapPin, Percent } from 'lucide-react';
 
@@ -145,7 +151,8 @@ export default function App() {
               discount_percent: settingsData.discount_percent !== undefined
                 ? Number(settingsData.discount_percent)
                 : (prev.discount_percent || 10),
-              discount_title: settingsData.discount_title || prev.discount_title || 'خصم خاص على جميع اللحوم البلدي',
+              discount_title: settingsData.discount_title || prev.discount_title || 'خصم خاص على أسعار اللحوم البلدي',
+              discount_target_category: settingsData.discount_target_category || prev.discount_target_category || 'all',
               discount_start_date: settingsData.discount_start_date || prev.discount_start_date || '',
               discount_end_date: settingsData.discount_end_date || prev.discount_end_date || ''
             };
@@ -196,8 +203,19 @@ export default function App() {
     loadSupabaseData();
   }, []);
 
-  // Filter products by category and search query
-  const filteredProducts = products.filter((prod) => {
+  // Compute dynamic product prices with discount applied directly on each cut
+  const effectiveProducts = useMemo(() => {
+    return products.map((prod) => {
+      const discountInfo = calculateProductDiscount(prod, storeSettings);
+      return {
+        ...prod,
+        ...discountInfo
+      };
+    });
+  }, [products, storeSettings]);
+
+  // Filter products by category and search query using effective discounted products
+  const filteredProducts = effectiveProducts.filter((prod) => {
     const categoryMatch = 
       selectedCategory === 'all' || 
       prod.category === selectedCategory ||

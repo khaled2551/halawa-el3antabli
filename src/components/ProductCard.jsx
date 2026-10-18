@@ -32,11 +32,28 @@ export default function ProductCard({ product, onSelectProduct }) {
             )}
           </div>
 
-          {/* Clean Price Presentation */}
-          <div className="price-tag-wrapper">
-            <span className="price-number tabular-nums">{Number(product.price_per_kg).toLocaleString('ar-EG')}</span>
-            <span className="price-unit">ج.م / كجم</span>
-          </div>
+          {/* Clean Price Presentation with Strikethrough Discount Support */}
+          {product.hasDiscount ? (
+            <div className="price-tag-wrapper has-discount">
+              <span className="product-card-discount-badge" aria-label={`خصم ${product.discountPercent} بالمئة`}>
+                خصم {product.discountPercent}%
+              </span>
+              <span className="original-price-strikethrough tabular-nums">
+                {Number(product.originalPrice).toLocaleString('ar-EG')} ج.م
+              </span>
+              <div className="active-discount-price-row">
+                <span className="price-number discounted tabular-nums">
+                  {Number(product.finalPrice).toLocaleString('ar-EG')}
+                </span>
+                <span className="price-unit">ج.م / كجم</span>
+              </div>
+            </div>
+          ) : (
+            <div className="price-tag-wrapper">
+              <span className="price-number tabular-nums">{Number(product.price_per_kg).toLocaleString('ar-EG')}</span>
+              <span className="price-unit">ج.م / كجم</span>
+            </div>
+          )}
         </div>
 
         {/* Culinary Description */}

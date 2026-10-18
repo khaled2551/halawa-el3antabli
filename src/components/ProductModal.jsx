@@ -14,7 +14,10 @@ export default function ProductModal({ product, isOpen, onClose, onAddToCart }) 
   );
   const [customNote, setCustomNote] = useState('');
 
-  const totalPrice = Math.round(Number(product.price_per_kg) * weight);
+  const activePricePerKg = product.hasDiscount ? Number(product.finalPrice) : Number(product.price_per_kg);
+  const baseOriginalPricePerKg = product.hasDiscount ? Number(product.originalPrice) : activePricePerKg;
+  const totalPrice = Math.round(activePricePerKg * weight);
+  const originalTotalPrice = Math.round(baseOriginalPricePerKg * weight);
 
   const handleWeightStep = (increment) => {
     setWeight((prev) => {
@@ -29,7 +32,11 @@ export default function ProductModal({ product, isOpen, onClose, onAddToCart }) 
       name: product.name,
       english_name: product.english_name,
       image_url: product.image_url,
-      price_per_kg: Number(product.price_per_kg),
+      price_per_kg: activePricePerKg,
+      original_price_per_kg: baseOriginalPricePerKg,
+      has_discount: Boolean(product.hasDiscount),
+      discount_percent: product.discountPercent || 0,
+      discount_title: product.discountTitle || '',
       weight: weight,
       cutStyle: selectedCut,
       fatOption: selectedFat,
@@ -71,6 +78,23 @@ export default function ProductModal({ product, isOpen, onClose, onAddToCart }) 
             {product.english_name && (
               <span className="modal-subtitle" lang="en">{product.english_name}</span>
             )}
+            <div className="modal-price-display-strip">
+              {product.hasDiscount ? (
+                <>
+                  <span className="modal-original-price tabular-nums">
+                    {Number(product.originalPrice).toLocaleString('ar-EG')} ج.م
+                  </span>
+                  <span className="modal-active-price tabular-nums">
+                    {Number(product.finalPrice).toLocaleString('ar-EG')} ج.م / كجم
+                  </span>
+                  <span className="modal-discount-tag">خصم {product.discountPercent}%</span>
+                </>
+              ) : (
+                <span className="modal-active-price tabular-nums">
+                  {Number(product.price_per_kg).toLocaleString('ar-EG')} ج.م / كجم
+                </span>
+              )}
+            </div>
           </div>
           {!product.image_url && (
             <button 
@@ -215,9 +239,21 @@ export default function ProductModal({ product, isOpen, onClose, onAddToCart }) 
         <div className="modal-footer">
           <div className="total-calculation">
             <span className="calc-label">إجمالي السعر:</span>
-            <span className="calc-amount tabular-nums">
-              {totalPrice.toLocaleString('ar-EG')} <small>ج.م</small>
-            </span>
+            <div className="calc-amounts-wrap">
+              {product.hasDiscount && (
+                <span className="calc-original-strikethrough tabular-nums">
+                  {originalTotalPrice.toLocaleString('ar-EG')} ج.م
+                </span>
+              )}
+              <span className="calc-amount tabular-nums">
+                {totalPrice.toLocaleString('ar-EG')} <small>ج.م</small>
+              </span>
+            </div>
+            {product.hasDiscount && (
+              <span className="calc-saved-hint tabular-nums">
+                (توفير {(originalTotalPrice - totalPrice).toLocaleString('ar-EG')} ج.م)
+              </span>
+            )}
           </div>
 
           <button

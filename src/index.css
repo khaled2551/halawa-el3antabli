@@ -3969,3 +3969,171 @@ input::placeholder, textarea::placeholder {
   color: var(--text-muted);
   border: 1px solid var(--border-subtle);
 }
+
+/* =====================================================================
+   PRODUCT-LEVEL DISCOUNT STYLING (ON THE CUTS, NOT JUST CART)
+   ===================================================================== */
+.price-tag-wrapper.has-discount {
+  border-color: rgba(212, 154, 61, 0.45);
+  background: linear-gradient(135deg, var(--bg-surface-elevated) 0%, rgba(212, 154, 61, 0.08) 100%);
+  position: relative;
+  padding: 6px 12px;
+}
+
+.product-card-discount-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, var(--brand-crimson) 0%, #b81720 100%);
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  margin-bottom: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.original-price-strikethrough {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: #ff6b6b;
+  text-decoration-thickness: 1.5px;
+  line-height: 1.1;
+}
+
+.active-discount-price-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 3px;
+}
+
+.price-number.discounted {
+  color: var(--brand-gold);
+  font-size: 1.25rem;
+  font-weight: 900;
+  text-shadow: 0 0 12px rgba(212, 154, 61, 0.25);
+}
+
+/* Modal Price Styling */
+.modal-price-display-strip {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.modal-original-price {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: #ff6b6b;
+}
+
+.modal-active-price {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--brand-gold);
+}
+
+.modal-discount-tag {
+  background: rgba(152, 18, 25, 0.85);
+  color: #fff;
+  border: 1px solid rgba(212, 154, 61, 0.4);
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+/* Modal Footer Calculation */
+.calc-amounts-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.calc-original-strikethrough {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: #ff6b6b;
+}
+
+.calc-saved-hint {
+  font-size: 0.76rem;
+  color: #4ade80;
+  font-weight: 700;
+  display: block;
+  margin-top: 2px;
+}
+
+/* Cart Item Price Actions */
+.item-price-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.cart-item-original-price {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: #ff6b6b;
+}
+
+/* Discount Product Preview Box in Admin */
+.discount-product-preview-box {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px dashed rgba(212, 154, 61, 0.35);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview-label {
+  font-size: 0.75rem;
+  color: var(--brand-gold);
+  font-weight: 700;
+}
+
+.preview-price-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.preview-prod-title {
+  font-weight: 800;
+  color: #ffffff;
+  font-size: 0.95rem;
+}
+
+.preview-old-price {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: #ff6b6b;
+}
+
+.preview-new-price {
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: var(--brand-gold);
+}
+
+.preview-discount-tag {
+  background: linear-gradient(135deg, var(--brand-crimson) 0%, #b81720 100%);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}

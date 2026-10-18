@@ -72,6 +72,7 @@ export default function AdminDashboard({
   const [discountTitle, setDiscountTitle] = useState(storeSettings?.discount_title || 'خصم خاص على جميع اللحوم البلدي');
   const [discountStartDate, setDiscountStartDate] = useState(storeSettings?.discount_start_date || '');
   const [discountEndDate, setDiscountEndDate] = useState(storeSettings?.discount_end_date || '');
+  const [discountTargetCategory, setDiscountTargetCategory] = useState(storeSettings?.discount_target_category || 'all');
   const [discountSavedMessage, setDiscountSavedMessage] = useState(false);
   
   // Settings Form State
@@ -153,7 +154,8 @@ export default function AdminDashboard({
       );
       setDiscountEnabled(Boolean(storeSettings.discount_enabled));
       setDiscountPercent(storeSettings.discount_percent ?? 10);
-      setDiscountTitle(storeSettings.discount_title || 'خصم خاص على جميع اللحوم البلدي');
+      setDiscountTitle(storeSettings.discount_title || 'خصم خاص على أسعار اللحوم البلدي');
+      setDiscountTargetCategory(storeSettings.discount_target_category || 'all');
       setDiscountStartDate(storeSettings.discount_start_date || '');
       setDiscountEndDate(storeSettings.discount_end_date || '');
     }
@@ -232,6 +234,7 @@ export default function AdminDashboard({
       discount_enabled: discountEnabled,
       discount_percent: Number(discountPercent),
       discount_title: discountTitle.trim(),
+      discount_target_category: discountTargetCategory,
       discount_start_date: discountStartDate || null,
       discount_end_date: discountEndDate || null
     };
@@ -995,8 +998,8 @@ export default function AdminDashboard({
           <section className="admin-tab-pane" aria-labelledby="discounts-mgmt-heading">
             <form className="admin-clean-form" onSubmit={handleSaveDiscounts}>
               <div className="form-legend">
-                <h2 id="discounts-mgmt-heading" className="pane-heading">إدارة العروض ونسبة الخصم</h2>
-                <p className="pane-subheading">تفعيل خصم عام على سلة المشتريات وتحديد فترة سريانه باليوم والساعة.</p>
+                <h2 id="discounts-mgmt-heading" className="pane-heading">إدارة عروض وتخفيضات أسعار المنتجات</h2>
+                <p className="pane-subheading">تفعيل نسبة خصم تطبق مباشرة على أسعار أصناف اللحوم مع شطب السعر القديم وتحديد فترة سريان العرض.</p>
               </div>
 
               {/* Toggle Switch */}
@@ -1005,10 +1008,10 @@ export default function AdminDashboard({
                   <div className="hero-control-meta">
                     <div className="hero-icon-title">
                       <Percent size={22} className="gold-accent-icon" aria-hidden="true" />
-                      <h3 className="hero-control-heading">حالة تفعيل الخصم على المتجر</h3>
+                      <h3 className="hero-control-heading">حالة تفعيل الخصم المباشر على المنتجات</h3>
                     </div>
                     <p className="hero-control-desc">
-                      عند التفعيل، يتم تطبيق نسبة الخصم تلقائياً للعملاء في السلة أثناء فترة العرض، ويظهر شريط ترويجي أعلى الموقع.
+                      عند التفعيل، يتم شطب السعر القديم وعرض السعر المخفض الجديد مع شارة الخصم مباشرة على كل صنف في واجهة المتجر.
                     </p>
                   </div>
 
@@ -1048,32 +1051,68 @@ export default function AdminDashboard({
                     }) ? (
                       <div className="status-badge-inline active">
                         <CheckCircle2 size={16} aria-hidden="true" />
-                        <span>العرض نشط حالياً ويطبق على كافة الطلبات في المتجر</span>
+                        <span>العرض نشط حالياً: أسعار الأصناف مخفضة الآن في المتجر</span>
                       </div>
                     ) : discountStartDate && new Date() < new Date(discountStartDate) ? (
                       <div className="status-badge-inline scheduled">
                         <Clock size={16} aria-hidden="true" />
-                        <span>العرض مجدول وسيبدأ في الموعد المحدد لاحقاً</span>
+                        <span>العرض مجدول وسيبدأ تخفيض الأسعار في الموعد المحدد لاحقاً</span>
                       </div>
                     ) : (
                       <div className="status-badge-inline expired">
                         <AlertCircle size={16} aria-hidden="true" />
-                        <span>انتهت فترة سريان العرض تلقائياً ولن يتم تطبيقه على الطلبات الجديدة</span>
+                        <span>انتهت فترة سريان العرض وعادت الأصناف لأسعارها الأصلية تلقائياً</span>
                       </div>
                     )
                   ) : (
                     <div className="status-badge-inline disabled">
                       <EyeOff size={16} aria-hidden="true" />
-                      <span>الخصم معطل حالياً ولن يُطبق للعملاء</span>
+                      <span>الخصم معطل حالياً (الأسعار العادية سارية)</span>
                     </div>
                   )}
                 </div>
+
+                {/* Sample product preview */}
+                {discountEnabled && (
+                  <div className="discount-product-preview-box">
+                    <span className="preview-label">معاينة شكل السعر أمام العميل في بطاقة الصنف:</span>
+                    <div className="preview-price-card">
+                      <span className="preview-prod-title">عرق فلتو صافي:</span>
+                      <span className="preview-old-price tabular-nums">1,050 ج.م</span>
+                      <span className="preview-new-price tabular-nums">
+                        {Math.round(1050 * (1 - (Number(discountPercent) || 10) / 100)).toLocaleString('ar-EG')} ج.م / كجم
+                      </span>
+                      <span className="preview-discount-tag">خصم {discountPercent}%</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Discount Percentage & Title */}
+              {/* Target Category Selector & Discount Percentage */}
               <div className="form-two-cols">
                 <div className="form-group">
-                  <label htmlFor="admin-discount-percent">نسبة الخصم (%): *</label>
+                  <label htmlFor="admin-discount-target">تطبيق الخصم على:</label>
+                  <div className="input-with-icon">
+                    <FolderTree size={18} className="field-icon" aria-hidden="true" />
+                    <select
+                      id="admin-discount-target"
+                      value={discountTargetCategory}
+                      onChange={(e) => setDiscountTargetCategory(e.target.value)}
+                      className="modal-select-field"
+                    >
+                      <option value="all">جميع أصناف المتجر (كافة اللحوم)</option>
+                      {categories.filter(c => c.slug !== 'all').map((c) => (
+                        <option key={c.id || c.slug} value={c.slug}>
+                          قسم: {c.name} فقط
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <span className="field-hint">اختر ما إذا كان الخصم يشمل كافة اللحوم أو قسماً محدداً.</span>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="admin-discount-percent">نسبة الخصم المباشر على السعر (%): *</label>
                   <div className="input-with-icon">
                     <Percent size={18} className="field-icon" aria-hidden="true" />
                     <input
@@ -1087,21 +1126,22 @@ export default function AdminDashboard({
                       className="tabular-nums"
                     />
                   </div>
-                  <span className="field-hint">مثال: 10 يعني خصم 10% من إجمالي الطلب.</span>
+                  <span className="field-hint">مثال: 10 يعني تخفيض 10% من سعر كل كيلو.</span>
                 </div>
+              </div>
 
-                <div className="form-group">
-                  <label htmlFor="admin-discount-title">عنوان أو سبب الخصم (يظهر في الشريط الترويجي والفاتورة):</label>
-                  <div className="input-with-icon">
-                    <Tag size={18} className="field-icon" aria-hidden="true" />
-                    <input
-                      id="admin-discount-title"
-                      type="text"
-                      value={discountTitle}
-                      onChange={(e) => setDiscountTitle(e.target.value)}
-                      placeholder="خصم خاص 10% على جميع اللحوم البلدي"
-                    />
-                  </div>
+              {/* Discount Title */}
+              <div className="form-group">
+                <label htmlFor="admin-discount-title">عنوان أو شعار العرض (يظهر في الشريط الترويجي):</label>
+                <div className="input-with-icon">
+                  <Tag size={18} className="field-icon" aria-hidden="true" />
+                  <input
+                    id="admin-discount-title"
+                    type="text"
+                    value={discountTitle}
+                    onChange={(e) => setDiscountTitle(e.target.value)}
+                    placeholder="خصم خاص 10% على أسعار اللحوم البلدي"
+                  />
                 </div>
               </div>
 
