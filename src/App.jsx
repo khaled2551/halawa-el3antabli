@@ -41,7 +41,16 @@ export default function App() {
   const [products, setProducts] = useState(() => {
     try {
       const saved = localStorage.getItem('halawa_products');
-      return saved ? JSON.parse(saved) : defaultProducts;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.map((p) => {
+          if (p.image_url && p.image_url.includes('/assets/products/')) {
+            return { ...p, image_url: null };
+          }
+          return p;
+        });
+      }
+      return defaultProducts;
     } catch {
       return defaultProducts;
     }
@@ -165,7 +174,8 @@ export default function App() {
           const sanitizedProds = prodData.map((p) => ({
             ...p,
             name: cleanEmoji(p.name),
-            badge: null
+            badge: null,
+            image_url: (p.image_url && !p.image_url.includes('/assets/products/')) ? p.image_url : null
           }));
           setProducts(sanitizedProds);
         }

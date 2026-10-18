@@ -93,7 +93,7 @@ export default function AdminDashboard({
   const [newProdEnglish, setNewProdEnglish] = useState('');
   const [newProdPrice, setNewProdPrice] = useState('');
   const [newProdCategory, setNewProdCategory] = useState('premium-steaks');
-  const [newProdImage, setNewProdImage] = useState('/assets/products/steaks.jpg');
+  const [newProdImage, setNewProdImage] = useState('');
   const [newProdImageFile, setNewProdImageFile] = useState(null);
   const [newProdImagePreview, setNewProdImagePreview] = useState(null);
   const [isUploadingNewProd, setIsUploadingNewProd] = useState(false);
@@ -382,15 +382,16 @@ export default function AdminDashboard({
 
   // Open Edit Product Modal
   const handleOpenEditModal = (product) => {
+    const cleanImg = (product.image_url && !product.image_url.includes('/assets/products/')) ? product.image_url : '';
     setEditingProductModal(product);
     setEditProdName(product.name || '');
     setEditProdEnglish(product.english_name || '');
     setEditProdPrice(product.price_per_kg || '');
     setEditProdCategory(product.category || 'premium-steaks');
     setEditProdDesc(product.description || '');
-    setEditProdImage(product.image_url || '');
+    setEditProdImage(cleanImg);
     setEditProdImageFile(null);
-    setEditProdImagePreview(product.image_url || null);
+    setEditProdImagePreview(cleanImg || null);
   };
 
   // Remove Image from Edit Modal
@@ -489,7 +490,7 @@ export default function AdminDashboard({
 
     setIsUploadingNewProd(true);
     try {
-      let finalImageUrl = newProdImage.trim() || '/assets/products/steaks.jpg';
+      let finalImageUrl = newProdImage.trim() || null;
 
       // If user chose a file from their device, upload directly to Supabase Storage
       if (newProdImageFile) {
@@ -524,7 +525,7 @@ export default function AdminDashboard({
       setNewProdEnglish('');
       setNewProdPrice('');
       setNewProdDesc('');
-      setNewProdImage('/assets/products/steaks.jpg');
+      setNewProdImage('');
       setNewProdImageFile(null);
       setNewProdImagePreview(null);
       setIsAddModalOpen(false);
@@ -650,8 +651,8 @@ export default function AdminDashboard({
               {filteredProducts.map((p) => {
                 const currentPrice = Number(p.price_per_kg);
                 const editedPrice = editingPrices[p.id] ?? currentPrice;
-                const currentImage = p.image_url || '/assets/products/steaks.jpg';
-                const editedImage = editingImages[p.id] ?? currentImage;
+                const currentImage = (p.image_url && !p.image_url.includes('/assets/products/')) ? p.image_url : '';
+                const editedImage = editingImages[p.id] !== undefined ? editingImages[p.id] : currentImage;
                 const isSaved = saveStatus[p.id];
                 const isAvailable = p.is_in_stock !== false;
 
