@@ -29,10 +29,15 @@ import {
   Edit2,
   ImageOff,
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  FolderTree,
+  Percent,
+  Tag,
+  Calendar
 } from 'lucide-react';
 import { supabase, uploadProductImage, deleteProductImage } from '../supabaseClient';
 import { computePinHash } from './AdminAuthGuard';
+import { isDiscountActive } from '../data/defaultProducts';
 
 export default function AdminDashboard({
   storeSettings,
@@ -44,10 +49,30 @@ export default function AdminDashboard({
   onDeleteProduct,
   onToggleStock,
   onAddNewProduct,
+  categories = [],
+  onAddCategory,
+  onUpdateCategory,
+  onDeleteCategory,
   onReturnToStore,
   onLogout
 }) {
-  const [activeTab, setActiveTab] = useState('products'); // 'products', 'settings', 'orders'
+  const [activeTab, setActiveTab] = useState('products'); // 'products', 'categories', 'discounts', 'orders', 'settings'
+  
+  // Category Management State
+  const [isAddCatModalOpen, setIsAddCatModalOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatSlug, setNewCatSlug] = useState('');
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [editCatName, setEditCatName] = useState('');
+  const [editCatSlug, setEditCatSlug] = useState('');
+
+  // Store-wide Promotion & Discount State
+  const [discountEnabled, setDiscountEnabled] = useState(Boolean(storeSettings?.discount_enabled));
+  const [discountPercent, setDiscountPercent] = useState(storeSettings?.discount_percent ?? 10);
+  const [discountTitle, setDiscountTitle] = useState(storeSettings?.discount_title || 'خصم خاص على جميع اللحوم البلدي');
+  const [discountStartDate, setDiscountStartDate] = useState(storeSettings?.discount_start_date || '');
+  const [discountEndDate, setDiscountEndDate] = useState(storeSettings?.discount_end_date || '');
+  const [discountSavedMessage, setDiscountSavedMessage] = useState(false);
   
   // Settings Form State
   const [whatsappNumber, setWhatsappNumber] = useState(storeSettings?.whatsapp_number || '201000000000');
@@ -126,6 +151,11 @@ export default function AdminDashboard({
       setHeroDescription(
         storeSettings.hero_description || 'أصول الجزارة البلدي من قلب المذبح. ننتقي لك أنعم القطعيات الطازجة، ونجهزها بتقطيعك المفضل ونوصلها لباب بيتك مباشرة عبر الواتساب.'
       );
+      setDiscountEnabled(Boolean(storeSettings.discount_enabled));
+      setDiscountPercent(storeSettings.discount_percent ?? 10);
+      setDiscountTitle(storeSettings.discount_title || 'خصم خاص على جميع اللحوم البلدي');
+      setDiscountStartDate(storeSettings.discount_start_date || '');
+      setDiscountEndDate(storeSettings.discount_end_date || '');
     }
   }, [storeSettings]);
 
@@ -170,26 +200,85 @@ export default function AdminDashboard({
     return () => window.removeEventListener('halawa_order_updated', handleOrderEvent);
   }, [activeTab]);
 
-  // Change order status
-  const handleToggleOrderStatus = (orderId, currentStatus) => {
-    const nextStatus = currentStatus === 'delivered' ? 'new' : currentStatus === 'preparing' ? 'delivered' : 'preparing';
-    const updated = orders.map((o) => (o.id === orderId ? { ...o, status: nextStatus } : o));
+  // Explicitly update order status (new, preparing, delivered)
+  const handleSetOrderStatus = async (orderId, targetStatus) => {
+    const updated = orders.map((o) => ((o.id === orderId || o.order_number === orderId) ? { ...o, status: targetStatus } : o));
     setOrders(updated);
     try {
       localStorage.setItem('halawa_orders', JSON.stringify(updated));
-      supabase.from('orders').update({ status: nextStatus }).eq('id', orderId).then();
-    } catch {}
+      await supabase.from('orders').update({ status: targetStatus }).eq('id', orderId);
+    } catch (err) {
+      console.warn('Set order status notice:', err);
+    }
   };
 
-  // Delete single order
-  const handleDeleteOrder = (orderId) => {
-    if (!window.confirm('هل تريد مسح هذا الطلب من السجل؟')) return;
-    const updated = orders.filter((o) => o.id !== orderId);
+  // Delete single order cleanly from local storage and Supabase
+  const handleDeleteOrder = async (orderId) => {
+    if (!window.confirm('هل تريد مسح هذا الطلب نهائياً من السجل؟')) return;
+    const updated = orders.filter((o) => o.id !== orderId && o.order_number !== orderId);
     setOrders(updated);
     try {
       localStorage.setItem('halawa_orders', JSON.stringify(updated));
-      supabase.from('orders').delete().eq('id', orderId).then();
-    } catch {}
+      await supabase.from('orders').delete().eq('id', orderId);
+    } catch (err) {
+      console.warn('Delete order notice:', err);
+    }
+  };
+
+  // Handle Save Store-wide Discounts
+  const handleSaveDiscounts = async (e) => {
+    if (e) e.preventDefault();
+    const updated = {
+      discount_enabled: discountEnabled,
+      discount_percent: Number(discountPercent),
+      discount_title: discountTitle.trim(),
+      discount_start_date: discountStartDate || null,
+      discount_end_date: discountEndDate || null
+    };
+
+    onUpdateSettings(updated);
+
+    try {
+      await supabase
+        .from('store_settings')
+        .update(updated)
+        .eq('id', 'main_config');
+    } catch (err) {
+      console.warn('Supabase discount settings sync:', err);
+    }
+
+    setDiscountSavedMessage(true);
+    setTimeout(() => setDiscountSavedMessage(false), 3000);
+  };
+
+  // Handle Add Category Submit
+  const handleAddCategorySubmit = (e) => {
+    e.preventDefault();
+    if (!newCatName.trim()) return;
+    const slug = newCatSlug.trim() || newCatName.trim().toLowerCase().replace(/\s+/g, '-');
+    if (onAddCategory) {
+      onAddCategory({
+        name: newCatName.trim(),
+        slug: slug,
+        icon: 'steak'
+      });
+    }
+    setNewCatName('');
+    setNewCatSlug('');
+    setIsAddCatModalOpen(false);
+  };
+
+  // Handle Edit Category Submit
+  const handleEditCategorySubmit = (e) => {
+    e.preventDefault();
+    if (!editingCategory || !editCatName.trim()) return;
+    if (onUpdateCategory) {
+      onUpdateCategory(editingCategory.id || editingCategory.slug, {
+        name: editCatName.trim(),
+        slug: editCatSlug.trim() || editingCategory.slug
+      });
+    }
+    setEditingCategory(null);
   };
 
   // Handle Instant Hero Banner Toggle
@@ -598,11 +687,20 @@ export default function AdminDashboard({
 
           <button
             type="button"
-            className={`admin-nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
+            className={`admin-nav-item ${activeTab === 'categories' ? 'active' : ''}`}
+            onClick={() => setActiveTab('categories')}
           >
-            <Settings size={17} aria-hidden="true" />
-            <span>إعدادات المتجر ورقم الواتساب</span>
+            <FolderTree size={17} aria-hidden="true" />
+            <span>إدارة التصنيفات ({categories.length})</span>
+          </button>
+
+          <button
+            type="button"
+            className={`admin-nav-item ${activeTab === 'discounts' ? 'active' : ''}`}
+            onClick={() => setActiveTab('discounts')}
+          >
+            <Percent size={17} aria-hidden="true" />
+            <span>العروض وفترة الخصم</span>
           </button>
 
           <button
@@ -611,7 +709,16 @@ export default function AdminDashboard({
             onClick={() => setActiveTab('orders')}
           >
             <ShoppingBag size={17} aria-hidden="true" />
-            <span>سجل الطلبات الواردة</span>
+            <span>سجل الطلبات الواردة ({orders.length})</span>
+          </button>
+
+          <button
+            type="button"
+            className={`admin-nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('settings')}
+          >
+            <Settings size={17} aria-hidden="true" />
+            <span>إعدادات المتجر ورقم الواتساب</span>
           </button>
         </nav>
 
@@ -796,7 +903,262 @@ export default function AdminDashboard({
           </section>
         )}
 
-        {/* TAB 2: STORE & WHATSAPP SETTINGS */}
+        {/* TAB 2: CATEGORIES MANAGEMENT */}
+        {activeTab === 'categories' && (
+          <section className="admin-tab-pane" aria-labelledby="categories-mgmt-heading">
+            <div className="pane-header-row">
+              <div>
+                <h2 id="categories-mgmt-heading" className="pane-heading">إدارة أقسام وتصنيفات المتجر ({categories.length})</h2>
+                <p className="pane-subheading">يمكنك إضافة أقسام جديدة، تعديل أسمائها ومفتاح الرابط، أو حذف أي قسم بحرية تامة.</p>
+              </div>
+
+              <button
+                type="button"
+                className="add-product-action-btn"
+                onClick={() => setIsAddCatModalOpen(true)}
+              >
+                <Plus size={16} aria-hidden="true" />
+                <span>إضافة قسم جديد</span>
+              </button>
+            </div>
+
+            <div className="categories-cards-grid">
+              {categories.map((cat) => {
+                const count = products.filter((p) => p.category === cat.slug).length;
+
+                return (
+                  <article key={cat.id || cat.slug} className="admin-category-card">
+                    <div className="cat-card-header">
+                      <div className="cat-icon-title">
+                        <div className="cat-badge-icon">
+                          <FolderTree size={20} aria-hidden="true" />
+                        </div>
+                        <div>
+                          <h3 className="cat-title">{cat.name}</h3>
+                          <span className="cat-slug-pill">{cat.slug}</span>
+                        </div>
+                      </div>
+
+                      <span className="cat-count-badge tabular-nums">
+                        {count} {count === 1 ? 'صنف' : 'أصناف'}
+                      </span>
+                    </div>
+
+                    <p className="cat-card-desc">
+                      {count > 0 
+                        ? `يحتوي هذا القسم حالياً على ${count} من أصناف اللحوم في المتجر.`
+                        : 'هذا القسم فارغ حالياً، يمكنك تعيين منتجات إليه عند إضافة أو تعديل أي صنف.'}
+                    </p>
+
+                    <div className="cat-card-actions">
+                      <button
+                        type="button"
+                        className="cat-edit-btn"
+                        onClick={() => {
+                          setEditingCategory(cat);
+                          setEditCatName(cat.name);
+                          setEditCatSlug(cat.slug);
+                        }}
+                      >
+                        <Edit2 size={14} aria-hidden="true" />
+                        <span>تعديل الاسم</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="cat-delete-btn"
+                        onClick={() => {
+                          if (count > 0) {
+                            if (!window.confirm(`تنبيه: هذا القسم يحتوي على ${count} صنف! هل أنت متأكد من حذفه؟`)) return;
+                          } else {
+                            if (!window.confirm(`هل أنت متأكد من حذف قسم "${cat.name}"؟`)) return;
+                          }
+                          if (onDeleteCategory) {
+                            onDeleteCategory(cat.id || cat.slug);
+                          }
+                        }}
+                        title="حذف هذا القسم"
+                      >
+                        <Trash2 size={14} aria-hidden="true" />
+                        <span>حذف</span>
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* TAB 3: DISCOUNTS & PROMOTIONS MANAGEMENT */}
+        {activeTab === 'discounts' && (
+          <section className="admin-tab-pane" aria-labelledby="discounts-mgmt-heading">
+            <form className="admin-clean-form" onSubmit={handleSaveDiscounts}>
+              <div className="form-legend">
+                <h2 id="discounts-mgmt-heading" className="pane-heading">إدارة العروض ونسبة الخصم</h2>
+                <p className="pane-subheading">تفعيل خصم عام على سلة المشتريات وتحديد فترة سريانه باليوم والساعة.</p>
+              </div>
+
+              {/* Toggle Switch */}
+              <div className="admin-hero-control-card discount-control-card">
+                <div className="hero-control-header">
+                  <div className="hero-control-meta">
+                    <div className="hero-icon-title">
+                      <Percent size={22} className="gold-accent-icon" aria-hidden="true" />
+                      <h3 className="hero-control-heading">حالة تفعيل الخصم على المتجر</h3>
+                    </div>
+                    <p className="hero-control-desc">
+                      عند التفعيل، يتم تطبيق نسبة الخصم تلقائياً للعملاء في السلة أثناء فترة العرض، ويظهر شريط ترويجي أعلى الموقع.
+                    </p>
+                  </div>
+
+                  <div className="hero-toggle-area">
+                    <label className="hero-toggle-pill" htmlFor="discount-enabled-switch">
+                      <input
+                        id="discount-enabled-switch"
+                        type="checkbox"
+                        className="hero-switch-input"
+                        checked={discountEnabled}
+                        onChange={(e) => setDiscountEnabled(e.target.checked)}
+                      />
+                      <span className="hero-toggle-indicator">
+                        {discountEnabled ? (
+                          <>
+                            <CheckCircle2 size={15} aria-hidden="true" />
+                            <span>الخصم مفعّل</span>
+                          </>
+                        ) : (
+                          <>
+                            <EyeOff size={15} aria-hidden="true" />
+                            <span>الخصم معطل</span>
+                          </>
+                        )}
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Live Status indicator */}
+                <div className="discount-live-banner-preview">
+                  {discountEnabled ? (
+                    isDiscountActive({
+                      discount_enabled: true,
+                      discount_start_date: discountStartDate,
+                      discount_end_date: discountEndDate
+                    }) ? (
+                      <div className="status-badge-inline active">
+                        <CheckCircle2 size={16} aria-hidden="true" />
+                        <span>العرض نشط حالياً ويطبق على كافة الطلبات في المتجر</span>
+                      </div>
+                    ) : discountStartDate && new Date() < new Date(discountStartDate) ? (
+                      <div className="status-badge-inline scheduled">
+                        <Clock size={16} aria-hidden="true" />
+                        <span>العرض مجدول وسيبدأ في الموعد المحدد لاحقاً</span>
+                      </div>
+                    ) : (
+                      <div className="status-badge-inline expired">
+                        <AlertCircle size={16} aria-hidden="true" />
+                        <span>انتهت فترة سريان العرض تلقائياً ولن يتم تطبيقه على الطلبات الجديدة</span>
+                      </div>
+                    )
+                  ) : (
+                    <div className="status-badge-inline disabled">
+                      <EyeOff size={16} aria-hidden="true" />
+                      <span>الخصم معطل حالياً ولن يُطبق للعملاء</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Discount Percentage & Title */}
+              <div className="form-two-cols">
+                <div className="form-group">
+                  <label htmlFor="admin-discount-percent">نسبة الخصم (%): *</label>
+                  <div className="input-with-icon">
+                    <Percent size={18} className="field-icon" aria-hidden="true" />
+                    <input
+                      id="admin-discount-percent"
+                      type="number"
+                      min="1"
+                      max="90"
+                      value={discountPercent}
+                      onChange={(e) => setDiscountPercent(e.target.value)}
+                      required
+                      className="tabular-nums"
+                    />
+                  </div>
+                  <span className="field-hint">مثال: 10 يعني خصم 10% من إجمالي الطلب.</span>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="admin-discount-title">عنوان أو سبب الخصم (يظهر في الشريط الترويجي والفاتورة):</label>
+                  <div className="input-with-icon">
+                    <Tag size={18} className="field-icon" aria-hidden="true" />
+                    <input
+                      id="admin-discount-title"
+                      type="text"
+                      value={discountTitle}
+                      onChange={(e) => setDiscountTitle(e.target.value)}
+                      placeholder="خصم خاص 10% على جميع اللحوم البلدي"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Discount Time Range (Start Date & End Date) */}
+              <div className="form-two-cols">
+                <div className="form-group">
+                  <label htmlFor="admin-discount-start">
+                    تاريخ ووقت بدء الخصم:
+                    <span className="hint-text">(اتركه فارغاً ليبدأ الخصم فوراً)</span>
+                  </label>
+                  <div className="input-with-icon">
+                    <Calendar size={18} className="field-icon" aria-hidden="true" />
+                    <input
+                      id="admin-discount-start"
+                      type="datetime-local"
+                      value={discountStartDate}
+                      onChange={(e) => setDiscountStartDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="admin-discount-end">
+                    تاريخ ووقت انتهاء الخصم:
+                    <span className="hint-text">(اتركه فارغاً ليستمر الخصم حتى إيقافه يدوياً)</span>
+                  </label>
+                  <div className="input-with-icon">
+                    <Calendar size={18} className="field-icon" aria-hidden="true" />
+                    <input
+                      id="admin-discount-end"
+                      type="datetime-local"
+                      value={discountEndDate}
+                      onChange={(e) => setDiscountEndDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <div className="form-actions-bar">
+                <button type="submit" className="save-settings-btn">
+                  <Save size={18} aria-hidden="true" />
+                  <span>حفظ إعدادات وتاريخ الخصم</span>
+                </button>
+
+                {discountSavedMessage && (
+                  <span className="save-success-tag" role="status" aria-live="polite">
+                    <Check size={16} aria-hidden="true" />
+                    <span>تم حفظ إعدادات الخصم بنجاح!</span>
+                  </span>
+                )}
+              </div>
+            </form>
+          </section>
+        )}
+
+        {/* TAB 4: STORE & WHATSAPP SETTINGS */}
         {activeTab === 'settings' && (
           <section className="admin-tab-pane" aria-labelledby="settings-heading">
             <form className="admin-clean-form" onSubmit={handleSaveSettings}>
@@ -1110,7 +1472,11 @@ export default function AdminDashboard({
                           <span className="order-num-pill tabular-nums">#{ord.order_number || String(ord.id).slice(0, 6)}</span>
                           
                           <span className={`order-status-pill ${status}`}>
-                            {status === 'delivered' ? 'تم التسليم' : status === 'preparing' ? 'جاري التجهيز' : 'طلب جديد'}
+                            {status === 'delivered' || status === 'completed'
+                              ? 'تم التسليم'
+                              : status === 'preparing'
+                              ? 'قيد التحضير'
+                              : 'طلب جديد'}
                           </span>
 
                           <span className={`order-delivery-pill ${isPickup ? 'pickup' : 'delivery'}`}>
@@ -1174,18 +1540,45 @@ export default function AdminDashboard({
                         </div>
                       )}
 
-                      {/* Status Toggle Action */}
+                      {/* Order Status Action Buttons Bar */}
                       <div className="order-actions-bar">
-                        <span className="status-label">تحديث الحالة:</span>
+                        <div className="status-button-group" role="group" aria-label="تحديد حالة الطلب">
+                          <button
+                            type="button"
+                            className={`status-choice-btn ${status === 'new' || status === 'pending' ? 'active-new' : ''}`}
+                            onClick={() => handleSetOrderStatus(ord.id, 'new')}
+                          >
+                            <Clock size={14} aria-hidden="true" />
+                            <span>طلب جديد</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            className={`status-choice-btn ${status === 'preparing' ? 'active-prep' : ''}`}
+                            onClick={() => handleSetOrderStatus(ord.id, 'preparing')}
+                          >
+                            <RefreshCw size={14} aria-hidden="true" />
+                            <span>قيد التحضير</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            className={`status-choice-btn ${status === 'delivered' || status === 'completed' ? 'active-done' : ''}`}
+                            onClick={() => handleSetOrderStatus(ord.id, 'delivered')}
+                          >
+                            <CheckCircle2 size={14} aria-hidden="true" />
+                            <span>تم التسليم</span>
+                          </button>
+                        </div>
+
                         <button
                           type="button"
-                          className="status-toggle-btn"
-                          onClick={() => handleToggleOrderStatus(ord.id, status)}
+                          className="order-delete-inline-btn"
+                          onClick={() => handleDeleteOrder(ord.id)}
+                          title="حذف هذا الطلب نهائياً"
                         >
-                          <CheckCircle2 size={14} aria-hidden="true" />
-                          <span>
-                            {status === 'new' ? 'بدء التجهيز' : status === 'preparing' ? 'تأكيد التسليم' : 'إعادة كجديد'}
-                          </span>
+                          <Trash2 size={14} aria-hidden="true" />
+                          <span>حذف الطلب</span>
                         </button>
                       </div>
                     </div>
@@ -1280,10 +1673,11 @@ export default function AdminDashboard({
                       onChange={(e) => setNewProdCategory(e.target.value)}
                       className="modal-select-field"
                     >
-                      <option value="premium-steaks">قطعيات وستيك فاخر</option>
-                      <option value="cooking-stew">لحوم طبيخ وسلق وطواجن</option>
-                      <option value="minced-specialties">مفروم ومصنعات العنتبلي</option>
-                      <option value="offal-liver">كبدة وحلويات لحوم بلدي</option>
+                      {categories.map((c) => (
+                        <option key={c.id || c.slug} value={c.slug}>
+                          {c.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -1555,10 +1949,11 @@ export default function AdminDashboard({
                       onChange={(e) => setEditProdCategory(e.target.value)}
                       className="modal-select-field"
                     >
-                      <option value="premium-steaks">قطعيات وستيك فاخر</option>
-                      <option value="cooking-stew">لحوم طبيخ وسلق وطواجن</option>
-                      <option value="minced-specialties">مفروم ومصنعات العنتبلي</option>
-                      <option value="offal-liver">كبدة وحلويات لحوم بلدي</option>
+                      {categories.map((c) => (
+                        <option key={c.id || c.slug} value={c.slug}>
+                          {c.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -1761,6 +2156,158 @@ export default function AdminDashboard({
                     )}
                   </button>
                 </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* MODAL: ADD CATEGORY */}
+      {isAddCatModalOpen && (
+        <div
+          className="admin-modal-backdrop"
+          onClick={() => setIsAddCatModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-cat-modal-title"
+        >
+          <div className="admin-modal-card compact" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <div>
+                <h2 id="add-cat-modal-title" className="admin-modal-title">إضافة قسم جديد للمتجر</h2>
+                <p className="admin-modal-subtitle">أدخل اسم القسم الجديد باللغة العربية والمعرّف الإنجليزي.</p>
+              </div>
+              <button
+                type="button"
+                className="admin-modal-close-btn"
+                onClick={() => setIsAddCatModalOpen(false)}
+                aria-label="إغلاق النافذة"
+              >
+                <X size={20} aria-hidden="true" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddCategorySubmit} className="admin-modal-form">
+              <div className="admin-modal-scroll-area">
+                <div className="form-group">
+                  <label htmlFor="new-cat-name">اسم القسم باللغة العربية: *</label>
+                  <input
+                    id="new-cat-name"
+                    type="text"
+                    placeholder="مثال: لحوم بتلو وضاني بلدي"
+                    value={newCatName}
+                    onChange={(e) => {
+                      setNewCatName(e.target.value);
+                      if (!newCatSlug) {
+                        setNewCatSlug(
+                          e.target.value
+                            .trim()
+                            .toLowerCase()
+                            .replace(/\s+/g, '-')
+                            .replace(/[^\w-]/g, '')
+                        );
+                      }
+                    }}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="new-cat-slug">
+                    المعرّف بالإنجليزية (Slug):
+                    <span className="hint-text">(يستخدم في الربط، اتركه فارغاً لإنشائه تلقائياً)</span>
+                  </label>
+                  <input
+                    id="new-cat-slug"
+                    type="text"
+                    placeholder="مثال: veal-lamb"
+                    value={newCatSlug}
+                    onChange={(e) => setNewCatSlug(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="admin-modal-footer">
+                <button
+                  type="button"
+                  className="modal-cancel-btn"
+                  onClick={() => setIsAddCatModalOpen(false)}
+                >
+                  إلغاء
+                </button>
+
+                <button type="submit" className="modal-submit-action-btn">
+                  <Plus size={16} aria-hidden="true" />
+                  <span>إضافة القسم الآن</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT CATEGORY */}
+      {editingCategory && (
+        <div
+          className="admin-modal-backdrop"
+          onClick={() => setEditingCategory(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-cat-modal-title"
+        >
+          <div className="admin-modal-card compact" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <div>
+                <h2 id="edit-cat-modal-title" className="admin-modal-title">تعديل القسم: {editingCategory.name}</h2>
+                <p className="admin-modal-subtitle">تعديل اسم القسم أو المعرّف الخاص به.</p>
+              </div>
+              <button
+                type="button"
+                className="admin-modal-close-btn"
+                onClick={() => setEditingCategory(null)}
+                aria-label="إغلاق النافذة"
+              >
+                <X size={20} aria-hidden="true" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditCategorySubmit} className="admin-modal-form">
+              <div className="admin-modal-scroll-area">
+                <div className="form-group">
+                  <label htmlFor="edit-cat-name">اسم القسم باللغة العربية: *</label>
+                  <input
+                    id="edit-cat-name"
+                    type="text"
+                    value={editCatName}
+                    onChange={(e) => setEditCatName(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="edit-cat-slug">المعرّف بالإنجليزية (Slug):</label>
+                  <input
+                    id="edit-cat-slug"
+                    type="text"
+                    value={editCatSlug}
+                    onChange={(e) => setEditCatSlug(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="admin-modal-footer">
+                <button
+                  type="button"
+                  className="modal-cancel-btn"
+                  onClick={() => setEditingCategory(null)}
+                >
+                  إلغاء
+                </button>
+
+                <button type="submit" className="modal-submit-action-btn">
+                  <Check size={16} aria-hidden="true" />
+                  <span>حفظ التعديل</span>
+                </button>
               </div>
             </form>
           </div>

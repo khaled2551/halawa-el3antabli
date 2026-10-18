@@ -302,3 +302,16 @@ using (bucket_id = 'product-images');
 create policy "Allow public delete on product images"
 on storage.objects for delete
 using (bucket_id = 'product-images');
+
+-- ==========================================================
+-- 8. تحديثات العروض وسجل الطلبات (Discounts & Order Additions)
+-- ==========================================================
+alter table public.store_settings 
+add column if not exists discount_enabled boolean default false,
+add column if not exists discount_percent numeric(5, 2) default 0,
+add column if not exists discount_title text default 'خصم خاص على جميع اللحوم البلدي',
+add column if not exists discount_start_date timestamptz,
+add column if not exists discount_end_date timestamptz;
+
+alter table public.orders
+add column if not exists delivery_type text default 'delivery';

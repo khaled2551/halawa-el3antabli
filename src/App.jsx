@@ -7,9 +7,9 @@ import CartDrawer from './components/CartDrawer';
 import AdminDashboard from './components/AdminDashboard';
 import AdminAuthGuard from './components/AdminAuthGuard';
 import PwaInstallBanner from './components/PwaInstallBanner';
-import { defaultStoreSettings, defaultCategories, defaultProducts } from './data/defaultProducts';
+import { defaultStoreSettings, defaultCategories, defaultProducts, isDiscountActive } from './data/defaultProducts';
 import { supabase } from './supabaseClient';
-import { ShoppingBag, Search, MapPin } from 'lucide-react';
+import { ShoppingBag, Search, MapPin, Percent } from 'lucide-react';
 
 export default function App() {
   // Check if current route is /admin or #admin
@@ -138,7 +138,16 @@ export default function App() {
                 : (typeof prev.show_hero_banner === 'boolean' ? prev.show_hero_banner : true),
               hero_title: settingsData.hero_title || prev.hero_title,
               hero_description: settingsData.hero_description || prev.hero_description,
-              maps_url: settingsData.maps_url || prev.maps_url
+              maps_url: settingsData.maps_url || prev.maps_url,
+              discount_enabled: typeof settingsData.discount_enabled === 'boolean'
+                ? settingsData.discount_enabled
+                : (typeof prev.discount_enabled === 'boolean' ? prev.discount_enabled : false),
+              discount_percent: settingsData.discount_percent !== undefined
+                ? Number(settingsData.discount_percent)
+                : (prev.discount_percent || 10),
+              discount_title: settingsData.discount_title || prev.discount_title || 'خصم خاص على جميع اللحوم البلدي',
+              discount_start_date: settingsData.discount_start_date || prev.discount_start_date || '',
+              discount_end_date: settingsData.discount_end_date || prev.discount_end_date || ''
             };
             try {
               localStorage.setItem('halawa_settings', JSON.stringify(merged));
@@ -295,6 +304,77 @@ export default function App() {
     });
   };
 
+  // Category Management Handlers
+  const handleAddCategory = async (newCat) => {
+    const slug = newCat.slug ? newCat.slug.trim().toLowerCase().replace(/\s+/g, '-') : ('cat-' + Date.now());
+    const catItem = {
+      id: newCat.id || ('custom_' + Date.now()),
+      name: cleanEmoji(newCat.name.trim()),
+      slug: slug,
+      icon: newCat.icon || 'steak',
+      display_order: categories.length + 1
+    };
+
+    setCategories((prev) => [...prev, catItem]);
+    try {
+      localStorage.setItem('halawa_categories', JSON.stringify([...categories, catItem]));
+      await supabase.from('categories').insert([{
+        name: catItem.name,
+        slug: catItem.slug,
+        icon: catItem.icon,
+        display_order: catItem.display_order
+      }]);
+    } catch (err) {
+      console.warn('Supabase add category note:', err);
+    }
+  };
+
+  const handleUpdateCategory = async (catIdentifier, updatedFields) => {
+    const sanitizedName = updatedFields.name ? cleanEmoji(updatedFields.name.trim()) : undefined;
+    const cleanFields = { ...updatedFields, ...(sanitizedName && { name: sanitizedName }) };
+
+    setCategories((prev) => {
+      const updated = prev.map((c) => (c.id === catIdentifier || c.slug === catIdentifier) ? { ...c, ...cleanFields } : c);
+      try {
+        localStorage.setItem('halawa_categories', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    try {
+      await supabase
+        .from('categories')
+        .update(cleanFields)
+        .or(`id.eq.${catIdentifier},slug.eq.${catIdentifier}`);
+    } catch (err) {
+      console.warn('Supabase update category note:', err);
+    }
+  };
+
+  const handleDeleteCategory = async (catIdentifier) => {
+    if (catIdentifier === 'all' || catIdentifier === '1') {
+      alert('لا يمكن حذف قسم "الكل" الأساسي.');
+      return;
+    }
+
+    setCategories((prev) => {
+      const updated = prev.filter((c) => c.id !== catIdentifier && c.slug !== catIdentifier);
+      try {
+        localStorage.setItem('halawa_categories', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    try {
+      await supabase
+        .from('categories')
+        .delete()
+        .or(`id.eq.${catIdentifier},slug.eq.${catIdentifier}`);
+    } catch (err) {
+      console.warn('Supabase delete category note:', err);
+    }
+  };
+
   // Inactivity Auto-Lock for Admin Dashboard (15 minutes)
   useEffect(() => {
     if (!isAdminRoute || !isAdminAuthenticated) return;
@@ -361,6 +441,10 @@ export default function App() {
         onDeleteProduct={handleDeleteProduct}
         onToggleStock={handleToggleStock}
         onAddNewProduct={handleAddNewProduct}
+        categories={categories}
+        onAddCategory={handleAddCategory}
+        onUpdateCategory={handleUpdateCategory}
+        onDeleteCategory={handleDeleteCategory}
         onReturnToStore={navigateToStore}
         onLogout={handleAdminLogout}
       />
@@ -368,6 +452,8 @@ export default function App() {
   }
 
   // ROUTE 2: CUSTOMER STOREFRONT (/)
+  const hasActiveDiscount = isDiscountActive(storeSettings);
+
   return (
     <div className="app-container">
       {/* Header */}
@@ -379,6 +465,26 @@ export default function App() {
 
       {/* Main Store Content */}
       <main className="store-main-content" role="main">
+        {/* Promotional Discount Notice Banner when active */}
+        {hasActiveDiscount && (
+          <aside className="storewide-promo-bar" aria-label="عرض خصم سارٍ">
+            <div className="promo-bar-content">
+              <span className="promo-pill">
+                <Percent size={14} aria-hidden="true" />
+                <span>خصم {storeSettings.discount_percent}%</span>
+              </span>
+              <strong className="promo-title">
+                {storeSettings.discount_title || 'عرض خاص سارٍ على سلة المشتريات الآن!'}
+              </strong>
+              {storeSettings.discount_end_date && (
+                <span className="promo-expiry tabular-nums">
+                  (سارٍ حتى {new Date(storeSettings.discount_end_date).toLocaleDateString('ar-EG')})
+                </span>
+              )}
+            </div>
+          </aside>
+        )}
+
         {/* Editorial Hero (Controlled from Admin Dashboard) */}
         {storeSettings?.show_hero_banner !== false && (
           <section className="store-hero" aria-label="مقدمة المتجر">

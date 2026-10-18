@@ -11,7 +11,29 @@ export const defaultStoreSettings = {
   maps_url: 'https://maps.app.goo.gl/koT5YPn28VA48SZU7',
   show_hero_banner: true,
   hero_title: 'عارف يعني ايه لحمة ؟!',
-  hero_description: 'أصول الجزارة البلدي من قلب المذبح. ننتقي لك أنعم القطعيات الطازجة، ونجهزها بتقطيعك المفضل ونوصلها لباب بيتك مباشرة عبر الواتساب.'
+  hero_description: 'أصول الجزارة البلدي من قلب المذبح. ننتقي لك أنعم القطعيات الطازجة، ونجهزها بتقطيعك المفضل ونوصلها لباب بيتك مباشرة عبر الواتساب.',
+  discount_enabled: false,
+  discount_percent: 10,
+  discount_title: 'خصم خاص على جميع اللحوم البلدي',
+  discount_start_date: '',
+  discount_end_date: ''
+};
+
+export const isDiscountActive = (settings) => {
+  if (!settings || !settings.discount_enabled) return false;
+  const pct = Number(settings.discount_percent);
+  if (!pct || pct <= 0) return false;
+
+  const now = Date.now();
+  if (settings.discount_start_date) {
+    const start = new Date(settings.discount_start_date).getTime();
+    if (!isNaN(start) && now < start) return false;
+  }
+  if (settings.discount_end_date) {
+    const end = new Date(settings.discount_end_date).getTime();
+    if (!isNaN(end) && now > end) return false;
+  }
+  return true;
 };
 
 export const defaultCategories = [

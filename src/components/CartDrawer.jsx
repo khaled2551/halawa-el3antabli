@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Trash2, Send, ShoppingBag, ShieldCheck, MapPin, Phone, User, FileText, Store, Truck } from 'lucide-react';
+import { X, Trash2, Send, ShoppingBag, ShieldCheck, MapPin, Phone, User, FileText, Store, Truck, Percent, Tag } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { supabase } from '../supabaseClient';
+import { isDiscountActive } from '../data/defaultProducts';
 
 export default function CartDrawer({
   isOpen,
@@ -23,10 +24,13 @@ export default function CartDrawer({
 
   const [lastSubmitTimestamp, setLastSubmitTimestamp] = useState(0);
 
-  // Calculations
+  // Calculations with Active Discount
   const subtotal = cartItems.reduce((acc, item) => acc + item.totalPrice, 0);
   const deliveryFee = deliveryType === 'pickup' ? 0 : Number(storeSettings?.delivery_fee || 0);
-  const grandTotal = subtotal + deliveryFee;
+  const discountActive = isDiscountActive(storeSettings);
+  const discountPercent = discountActive ? Number(storeSettings?.discount_percent || 0) : 0;
+  const discountAmount = discountActive ? Math.round(subtotal * (discountPercent / 100)) : 0;
+  const grandTotal = Math.max(0, subtotal - discountAmount + deliveryFee);
 
   // Security & Validation
   const validate = () => {
@@ -89,15 +93,18 @@ export default function CartDrawer({
         ? `استلام من الفرع: ${storeSettings?.address || 'مقر جزارة حلاوة العنتبلي'}` 
         : customerAddress.trim().slice(0, 150);
 
-      const orderPayload = {
+      // Clean payload strictly matching Supabase orders table schema:
+      // (customer_name, customer_phone, customer_address, items, total_amount, delivery_fee, notes, status)
+      const dbOrderPayload = {
         customer_name: customerName.trim().slice(0, 50),
         customer_phone: customerPhone.replace(/\D/g, '').slice(0, 15),
         customer_address: deliveryText,
-        delivery_type: deliveryType,
         items: cartItems,
         total_amount: grandTotal,
         delivery_fee: deliveryFee,
-        notes: orderNotes.trim().slice(0, 250) || null,
+        notes: (orderNotes.trim() 
+          ? `[${deliveryType === 'pickup' ? 'استلام من الفرع' : 'توصيل للمنزل'}] ${orderNotes.trim()}` 
+          : `[${deliveryType === 'pickup' ? 'استلام من الفرع' : 'توصيل للمنزل'}]`).slice(0, 250),
         status: 'new'
       };
 
@@ -107,7 +114,12 @@ export default function CartDrawer({
         const localRecord = {
           id: 'ord_' + Date.now(),
           order_number: orderNumber,
-          ...orderPayload,
+          ...dbOrderPayload,
+          delivery_type: deliveryType,
+          subtotal: subtotal,
+          discount_amount: discountAmount,
+          discount_percent: discountPercent,
+          discount_title: discountActive ? storeSettings?.discount_title : null,
           created_at: new Date().toISOString()
         };
         localOrders.unshift(localRecord);
@@ -117,11 +129,11 @@ export default function CartDrawer({
         console.warn('LocalStorage order write notice:', err);
       }
 
-      // 2. Also record to Supabase if connected
+      // 2. Also record cleanly to Supabase
       try {
         await supabase
           .from('orders')
-          .insert([orderPayload]);
+          .insert([dbOrderPayload]);
       } catch (err) {
         console.warn('Supabase order logging notice (falling back gracefully):', err);
       }
@@ -165,6 +177,9 @@ export default function CartDrawer({
       message += `──────────────────────────\n`;
       message += `*ملخص الحساب:*\n`;
       message += `• إجمالي قيمة اللحوم: ${subtotal.toLocaleString('ar-EG')} ج.م\n`;
+      if (discountActive && discountAmount > 0) {
+        message += `• خصم العرض (${storeSettings?.discount_title || 'عرض ترويجي'} - ${discountPercent}%): -${discountAmount.toLocaleString('ar-EG')} ج.م\n`;
+      }
       if (deliveryType === 'pickup') {
         message += `• رسوم التوصيل: 0 ج.م (استلام من الفرع مجاناً)\n`;
       } else {
@@ -340,6 +355,17 @@ export default function CartDrawer({
                   <span>إجمالي قطعيات اللحوم:</span>
                   <span className="tabular-nums">{subtotal.toLocaleString('ar-EG')} ج.م</span>
                 </div>
+                {discountActive && discountAmount > 0 && (
+                  <div className="breakdown-row discount-applied-row">
+                    <span className="discount-applied-label">
+                      <Percent size={13} aria-hidden="true" />
+                      <span>خصم العرض ({discountPercent}%):</span>
+                    </span>
+                    <span className="discount-applied-val tabular-nums">
+                      -{discountAmount.toLocaleString('ar-EG')} ج.م
+                    </span>
+                  </div>
+                )}
                 <div className="breakdown-row">
                   <span>رسوم التوصيل:</span>
                   <span className="tabular-nums">
