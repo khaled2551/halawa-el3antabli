@@ -1,0 +1,79 @@
+import React from 'react';
+import { Plus } from 'lucide-react';
+
+export default function ProductCard({ product, onSelectProduct }) {
+  const isAvailable = product.is_in_stock !== false;
+
+  return (
+    <article className={`product-card ${!isAvailable ? 'out-of-stock' : ''}`} aria-labelledby={`prod-title-${product.id}`}>
+      {/* Heroic Meat Cut Photography (Clean, No Cluttering Overlays) */}
+      {product.image_url && (
+        <div className="product-image-frame">
+          <img
+            src={product.image_url}
+            alt={product.name}
+            className="product-photo"
+            loading="lazy"
+            width="480"
+            height="270"
+          />
+        </div>
+      )}
+
+      <div className="product-card-body">
+        {/* Title and Price Hierarchy */}
+        <div className="product-card-top">
+          <div className="title-area">
+            <h2 id={`prod-title-${product.id}`} className="product-name">
+              {product.name}
+            </h2>
+            {product.english_name && (
+              <span className="product-english-name" lang="en">{product.english_name}</span>
+            )}
+          </div>
+
+          {/* Clean Price Presentation */}
+          <div className="price-tag-wrapper">
+            <span className="price-number tabular-nums">{Number(product.price_per_kg).toLocaleString('ar-EG')}</span>
+            <span className="price-unit">ج.م / كجم</span>
+          </div>
+        </div>
+
+        {/* Culinary Description */}
+        {product.description && (
+          <p className="product-description">{product.description}</p>
+        )}
+
+        {/* Cuts Summary */}
+        {product.available_cuts && product.available_cuts.length > 0 && (
+          <div className="cuts-preview" aria-label="خيارات التقطيع">
+            <span className="cuts-label">التقطيع المتاح:</span>
+            <span className="cuts-list">
+              {product.available_cuts.slice(0, 3).join(' • ')}
+              {product.available_cuts.length > 3 && ' …'}
+            </span>
+          </div>
+        )}
+
+        {/* Action Button */}
+        <div className="product-card-footer">
+          {isAvailable ? (
+            <button
+              type="button"
+              className="customize-btn"
+              onClick={() => onSelectProduct(product)}
+              aria-label={`تحديد وزن وتقطيع ${product.name}`}
+            >
+              <Plus size={16} aria-hidden="true" />
+              <span>تحديد التقطيع والوزن</span>
+            </button>
+          ) : (
+            <div className="out-of-stock-label" aria-live="polite">
+              غير متوفر لليوم
+            </div>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}

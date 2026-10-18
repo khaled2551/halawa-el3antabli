@@ -1,0 +1,18 @@
+{
+  "name": "حلاوة العنتبلي | جزارة اللحوم البلدي",
+  "short_name": "العنتبلي",
+  "description": "عارف يعني ايه لحمة ؟! متجر جزارة حلاوة العنتبلي للحوم البلدي الطازجة",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0b0b",
+  "theme_color": "#981219",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/assets/logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
