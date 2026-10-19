@@ -131,7 +131,17 @@ export default function App() {
           .eq('id', 'main_config')
           .maybeSingle();
 
+        let remoteDiscountsMap = {};
         if (settingsData) {
+          if (settingsData.discount_title) {
+            try {
+              const parsed = JSON.parse(settingsData.discount_title);
+              if (parsed && (parsed._type === 'product_discounts_map' || parsed.discounts)) {
+                remoteDiscountsMap = parsed.discounts || {};
+              }
+            } catch {}
+          }
+
           setStoreSettings((prev) => {
             const merged = {
               ...prev,
@@ -144,17 +154,7 @@ export default function App() {
                 : (typeof prev.show_hero_banner === 'boolean' ? prev.show_hero_banner : true),
               hero_title: settingsData.hero_title || prev.hero_title,
               hero_description: settingsData.hero_description || prev.hero_description,
-              maps_url: settingsData.maps_url || prev.maps_url,
-              discount_enabled: typeof settingsData.discount_enabled === 'boolean'
-                ? settingsData.discount_enabled
-                : (typeof prev.discount_enabled === 'boolean' ? prev.discount_enabled : false),
-              discount_percent: settingsData.discount_percent !== undefined
-                ? Number(settingsData.discount_percent)
-                : (prev.discount_percent || 10),
-              discount_title: settingsData.discount_title || prev.discount_title || 'خصم خاص على أسعار اللحوم البلدي',
-              discount_target_category: settingsData.discount_target_category || prev.discount_target_category || 'all',
-              discount_start_date: settingsData.discount_start_date || prev.discount_start_date || '',
-              discount_end_date: settingsData.discount_end_date || prev.discount_end_date || ''
+              maps_url: settingsData.maps_url || prev.maps_url
             };
             try {
               localStorage.setItem('halawa_settings', JSON.stringify(merged));
@@ -180,20 +180,52 @@ export default function App() {
           ]);
         }
 
-        // 3. Fetch Products (Sanitize names and remove generic AI slop badges)
+        // 3. Fetch Products (Sanitize names and merge discounts intelligently)
         const { data: prodData } = await supabase
           .from('products')
           .select('*')
           .order('display_order', { ascending: true });
 
         if (prodData && prodData.length > 0) {
-          const sanitizedProds = prodData.map((p) => ({
-            ...p,
-            name: cleanEmoji(p.name),
-            badge: null,
-            image_url: (p.image_url && !p.image_url.includes('/assets/products/')) ? p.image_url : null
-          }));
-          setProducts(sanitizedProds);
+          setProducts((prev) => {
+            const localMap = new Map((prev || []).map((item) => [item.id, item]));
+
+            const merged = prodData.map((p) => {
+              const existing = localMap.get(p.id);
+              const mapEntry = remoteDiscountsMap[p.id];
+
+              // Priority for discount_percent:
+              // 1. Column from Supabase product table if present and > 0
+              // 2. Entry from store_settings remoteDiscountsMap
+              // 3. Existing local state / localStorage
+              let discountPct = null;
+              if (p.discount_percent !== undefined && p.discount_percent !== null && Number(p.discount_percent) > 0) {
+                discountPct = Number(p.discount_percent);
+              } else if (mapEntry && mapEntry.percent && Number(mapEntry.percent) > 0) {
+                discountPct = Number(mapEntry.percent);
+              } else if (existing && existing.discount_percent && Number(existing.discount_percent) > 0) {
+                discountPct = Number(existing.discount_percent);
+              }
+
+              const startD = p.discount_start_date || mapEntry?.startDate || existing?.discount_start_date || null;
+              const endD = p.discount_end_date || mapEntry?.endDate || existing?.discount_end_date || null;
+
+              return {
+                ...p,
+                name: cleanEmoji(p.name),
+                badge: null,
+                image_url: (p.image_url && !p.image_url.includes('/assets/products/')) ? p.image_url : null,
+                discount_percent: discountPct,
+                discount_start_date: startD,
+                discount_end_date: endD
+              };
+            });
+
+            try {
+              localStorage.setItem('halawa_products', JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
         }
       } catch (err) {
         console.warn('Supabase initial fetch info (using robust offline data):', err);
@@ -291,12 +323,43 @@ export default function App() {
     });
   };
 
+  // Sync the product-level discounts map to Supabase store_settings.discount_title
+  // so all client devices, phones, and browsers immediately show the discounted prices
+  const syncDiscountsMapToSupabase = async (allProds) => {
+    try {
+      const discountsMap = {};
+      allProds.forEach((p) => {
+        if (p.discount_percent && Number(p.discount_percent) > 0) {
+          discountsMap[p.id] = {
+            percent: Number(p.discount_percent),
+            startDate: p.discount_start_date || null,
+            endDate: p.discount_end_date || null
+          };
+        }
+      });
+
+      await supabase
+        .from('store_settings')
+        .update({
+          discount_title: JSON.stringify({
+            _type: 'product_discounts_map',
+            discounts: discountsMap,
+            updated_at: new Date().toISOString()
+          })
+        })
+        .eq('id', 'main_config');
+    } catch (err) {
+      console.warn('Sync discounts map to Supabase warning:', err);
+    }
+  };
+
   const handleUpdateFullProduct = (productId, updatedFields) => {
     setProducts((prev) => {
       const updated = prev.map((p) => (p.id === productId ? { ...p, ...updatedFields } : p));
       try {
         localStorage.setItem('halawa_products', JSON.stringify(updated));
       } catch {}
+      syncDiscountsMapToSupabase(updated);
       return updated;
     });
   };
@@ -307,6 +370,7 @@ export default function App() {
       try {
         localStorage.setItem('halawa_products', JSON.stringify(updated));
       } catch {}
+      syncDiscountsMapToSupabase(updated);
       return updated;
     });
     supabase.from('products').delete().eq('id', productId).then();
@@ -319,6 +383,7 @@ export default function App() {
       try {
         localStorage.setItem('halawa_products', JSON.stringify(updated));
       } catch {}
+      syncDiscountsMapToSupabase(updated);
       return updated;
     });
   };

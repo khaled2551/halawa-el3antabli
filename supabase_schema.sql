@@ -316,7 +316,9 @@ add column if not exists discount_end_date timestamptz;
 
 alter table public.products
 add column if not exists sale_price numeric(10, 2),
-add column if not exists discount_percent numeric(5, 2);
+add column if not exists discount_percent numeric(5, 2),
+add column if not exists discount_start_date timestamptz,
+add column if not exists discount_end_date timestamptz;
 
 alter table public.orders
 add column if not exists delivery_type text default 'delivery';

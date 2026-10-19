@@ -42,7 +42,8 @@ export const isProductDiscountTimeValid = (item) => {
   const now = Date.now();
   if (item.discount_start_date) {
     const start = new Date(item.discount_start_date).getTime();
-    if (!isNaN(start) && now < start) return false;
+    // 15-minute grace window for clock drift or if merchant picked today's hour
+    if (!isNaN(start) && (now + 15 * 60 * 1000) < start) return false;
   }
   if (item.discount_end_date) {
     const end = new Date(item.discount_end_date).getTime();
