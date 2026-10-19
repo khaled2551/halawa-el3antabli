@@ -160,12 +160,6 @@ export default function AdminDashboard({
       setHeroDescription(
         storeSettings.hero_description || 'أصول الجزارة البلدي من قلب المذبح. ننتقي لك أنعم القطعيات الطازجة، ونجهزها بتقطيعك المفضل ونوصلها لباب بيتك مباشرة عبر الواتساب.'
       );
-      setDiscountEnabled(Boolean(storeSettings.discount_enabled));
-      setDiscountPercent(storeSettings.discount_percent ?? 10);
-      setDiscountTitle(storeSettings.discount_title || 'خصم خاص على أسعار اللحوم البلدي');
-      setDiscountTargetCategory(storeSettings.discount_target_category || 'all');
-      setDiscountStartDate(storeSettings.discount_start_date || '');
-      setDiscountEndDate(storeSettings.discount_end_date || '');
     }
   }, [storeSettings]);
 
