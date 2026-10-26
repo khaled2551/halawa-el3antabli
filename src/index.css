@@ -173,23 +173,60 @@ input::placeholder, textarea::placeholder {
 .announcement-bar {
   background-color: var(--brand-crimson);
   color: #fff;
-  padding: 7px 16px;
+  padding: 8px 16px;
   font-size: 0.82rem;
   font-weight: 600;
   text-align: center;
   border-bottom: 1px solid rgba(212, 154, 61, 0.25);
   letter-spacing: 0.01em;
+  overflow: hidden;
+  position: relative;
 }
 
-.announcement-content {
+.announcement-bar.theme-crimson {
+  background-color: var(--brand-crimson);
+  color: #ffffff;
+}
+
+.announcement-bar.theme-gold {
+  background: linear-gradient(90deg, #1f1406 0%, #2f1d08 50%, #1f1406 100%);
+  color: #ffdfa3;
+  border-bottom: 1px solid rgba(212, 154, 61, 0.45);
+}
+
+.announcement-bar.theme-black {
+  background-color: #121011;
+  color: #ece4db;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.announcement-track {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 16px;
 }
 
-.announcement-icon {
-  color: var(--brand-gold);
+.announcement-bar.is-ticker {
+  white-space: nowrap;
+}
+
+.announcement-bar.is-ticker .announcement-track {
+  display: inline-flex;
+  justify-content: flex-start;
+  animation: announcementTickerAnim 22s linear infinite;
+  padding-right: 20px;
+}
+
+@keyframes announcementTickerAnim {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .announcement-bar.is-ticker .announcement-track {
+    animation: none !important;
+  }
 }
 
 .main-header {
@@ -277,12 +314,49 @@ input::placeholder, textarea::placeholder {
 }
 
 /* =====================================================================
-   HERO BANNER
+   HERO BANNER & STORE STATUS BANNER
    ===================================================================== */
+.store-closed-banner {
+  background: linear-gradient(90deg, #2b1111 0%, #3d1414 50%, #2b1111 100%);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.4);
+  color: #ffcccc;
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.store-closed-banner .closed-pill {
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
 .store-hero {
   padding: 24px 20px 20px;
   border-bottom: 1px solid var(--border-subtle);
   background-color: var(--bg-surface);
+}
+
+.hero-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(212, 154, 61, 0.12);
+  color: var(--brand-gold);
+  border: 1px solid rgba(212, 154, 61, 0.35);
+  padding: 3px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-bottom: 10px;
 }
 
 .hero-title {
@@ -472,6 +546,26 @@ input::placeholder, textarea::placeholder {
   border-radius: var(--radius-full);
   font-size: 0.72rem;
   font-weight: 700;
+}
+
+.photo-discount-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, var(--brand-crimson) 0%, #780e15 100%);
+  color: #ffffff;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 0.82rem;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(212, 154, 61, 0.55);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.65), 0 0 10px rgba(152, 18, 25, 0.5);
+  z-index: 10;
+  letter-spacing: 0.02em;
 }
 
 .product-card-body {
@@ -4703,5 +4797,233 @@ input::placeholder, textarea::placeholder {
   font-size: 0.78rem;
   color: var(--brand-gold);
   font-weight: 700;
+}
+
+/* =====================================================================
+   PRODUCT CUTTING OPTIONS MANAGER (Add & Edit Modal)
+   ===================================================================== */
+.product-cutting-manager-card {
+  background: var(--bg-ground);
+  border: 1px solid rgba(212, 154, 61, 0.35);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cutting-toggle-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.cutting-label-bold {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  cursor: pointer;
+}
+
+.cutting-desc-hint {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.styled-toggle-checkbox {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  accent-color: var(--brand-gold);
+  cursor: pointer;
+  margin-top: 2px;
+}
+
+.cutting-tags-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(212, 154, 61, 0.25);
+}
+
+.cuts-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cutting-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(212, 154, 61, 0.12);
+  border: 1px solid rgba(212, 154, 61, 0.4);
+  color: #fce8cc;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.remove-cut-btn {
+  background: none;
+  border: none;
+  color: #ff9999;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  border-radius: 50%;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.remove-cut-btn:hover {
+  color: #ffffff;
+  background: rgba(239, 68, 68, 0.4);
+}
+
+.add-cut-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.add-cut-input-row input {
+  flex: 1;
+  font-size: 0.88rem;
+  padding: 9px 14px;
+}
+
+.add-cut-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-brand);
+  color: var(--brand-gold);
+  padding: 0 16px;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.add-cut-btn:hover {
+  background: var(--brand-gold);
+  color: #0c0a0a;
+}
+
+.quick-presets-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.presets-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.presets-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preset-chip-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.preset-chip-btn:hover:not(:disabled) {
+  border-color: var(--brand-gold);
+  color: var(--brand-gold);
+  background: rgba(212, 154, 61, 0.1);
+}
+
+.preset-chip-btn:disabled, .preset-chip-btn.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+/* Discount Quick Percentage Preset Buttons */
+.discount-presets-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.discount-preset-btn {
+  background: rgba(212, 154, 61, 0.08);
+  border: 1px solid rgba(212, 154, 61, 0.3);
+  color: var(--brand-gold);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.discount-preset-btn:hover {
+  background: var(--brand-gold);
+  color: #0c0a0a;
+}
+
+.discount-preset-btn.active {
+  background: var(--brand-gold);
+  color: #0c0a0a;
+  border-color: var(--brand-gold);
+}
+
+/* Settings Sections in Tab 5 */
+.admin-settings-section {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.settings-section-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 12px;
+}
+
+.settings-section-heading {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.settings-section-desc {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-top: -8px;
 }
 

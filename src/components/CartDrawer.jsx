@@ -169,33 +169,25 @@ export default function CartDrawer({
 
       cartItems.forEach((item, idx) => {
         message += `${idx + 1}) *${item.name}*\n`;
-        message += `   - الوزن: ${item.weight} كجم\n`;
-        if (item.cutStyle) message += `   - طريقة التقطيع: ${item.cutStyle}\n`;
-        if (item.fatOption) message += `   - نسبة الدهن: ${item.fatOption}\n`;
-        if (item.note) message += `   - ملاحظة: ${item.note}\n`;
-        if (item.has_discount && item.original_price_per_kg && item.original_price_per_kg > item.price_per_kg) {
-          const originalItemTotal = Math.round(item.original_price_per_kg * item.weight);
-          message += `   - السعر المخفض: *${item.totalPrice.toLocaleString('ar-EG')} ج.م* (بدلاً من ${originalItemTotal.toLocaleString('ar-EG')} ج.م - خصم ${item.discount_percent}%)\n\n`;
-        } else {
-          message += `   - السعر: ${item.totalPrice.toLocaleString('ar-EG')} ج.م (${item.price_per_kg} ج.م/كجم)\n\n`;
+        message += `   - الوزن المطلوب: ${item.weight} كجم\n`;
+        if (item.cutStyle && item.cutStyle !== 'سليم بدون تقطيع') {
+          message += `   - طريقة التقطيع: ${item.cutStyle}\n`;
         }
+        if (item.fatOption) {
+          message += `   - نسبة الدهن: ${item.fatOption}\n`;
+        }
+        if (item.note) {
+          message += `   - ملاحظة إضافية: ${item.note}\n`;
+        }
+        message += `\n`;
       });
 
       message += `──────────────────────────\n`;
-      message += `*ملخص الحساب:*\n`;
-      message += `• إجمالي قيمة اللحوم: ${subtotal.toLocaleString('ar-EG')} ج.م\n`;
-      if (totalSavings > 0) {
-        message += `• إجمالي التوفير من عروض اللحوم: ${Math.round(totalSavings).toLocaleString('ar-EG')} ج.م\n`;
-      }
-      if (deliveryType === 'pickup') {
-        message += `• رسوم التوصيل: 0 ج.م (استلام من الفرع مجاناً)\n`;
-      } else {
-        message += `• رسوم التوصيل: ${deliveryFee > 0 ? `${deliveryFee.toLocaleString('ar-EG')} ج.م` : 'مجاناً'}\n`;
-      }
-      message += `• *المبلغ الإجمالي المطلوب للدفع:* ${grandTotal.toLocaleString('ar-EG')} ج.م\n`;
+      message += `*ملاحظة المذبح والوزن:* \n`;
+      message += `يتم وزن القطعيات طازجة عند التجهيز، وسيتم تأكيد الوزن الفعلي وإصدار الفاتورة النهائية لحضرتكم مباشرة.\n`;
       message += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-      message += `تم إنشاء هذا الطلب إلكترونياً عبر تطبيق حلاوة العنتبلي الرسمي.\n`;
-      message += `برجاء تأكيد الطلب للبدء في تجهيز اللحوم طازجة فوراً.`;
+      message += `تم إرسال هذا الطلب إلكترونياً عبر تطبيق حلاوة العنتبلي.\n`;
+      message += `برجاء تأكيد استلام الطلب لبدء التجهيز الطازج فوراً.`;
 
       // 4. Trigger Celebratory Confetti
       confetti({

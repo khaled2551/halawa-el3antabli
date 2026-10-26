@@ -3,10 +3,11 @@ import { Plus } from 'lucide-react';
 
 export default function ProductCard({ product, onSelectProduct }) {
   const isAvailable = product.is_in_stock !== false;
+  const hasCutting = product.has_cutting_options !== false && Boolean(product.available_cuts && product.available_cuts.length > 0);
 
   return (
     <article className={`product-card ${!isAvailable ? 'out-of-stock' : ''}`} aria-labelledby={`prod-title-${product.id}`}>
-      {/* Heroic Meat Cut Photography (Clean, No Cluttering Overlays) */}
+      {/* Meat Cut Photography with Visual Discount Ribbon */}
       {product.image_url && (
         <div className="product-image-frame">
           <img
@@ -17,6 +18,11 @@ export default function ProductCard({ product, onSelectProduct }) {
             width="480"
             height="270"
           />
+          {product.hasDiscount && (
+            <span className="photo-discount-badge" aria-label={`خصم ${product.discountPercent} بالمئة`}>
+              خصم {product.discountPercent}%
+            </span>
+          )}
         </div>
       )}
 
@@ -61,9 +67,9 @@ export default function ProductCard({ product, onSelectProduct }) {
           <p className="product-description">{product.description}</p>
         )}
 
-        {/* Cuts Summary */}
-        {product.available_cuts && product.available_cuts.length > 0 && (
-          <div className="cuts-preview" aria-label="خيارات التقطيع">
+        {/* Cuts Summary (Only shown if product has cutting options) */}
+        {hasCutting && (
+          <div className="cuts-preview" aria-label="خيارات التقطيع المتاحة">
             <span className="cuts-label">التقطيع المتاح:</span>
             <span className="cuts-list">
               {product.available_cuts.slice(0, 3).join(' • ')}
@@ -79,10 +85,10 @@ export default function ProductCard({ product, onSelectProduct }) {
               type="button"
               className="customize-btn"
               onClick={() => onSelectProduct(product)}
-              aria-label={`تحديد وزن وتقطيع ${product.name}`}
+              aria-label={hasCutting ? `تحديد وزن وتقطيع ${product.name}` : `تحديد وزن ${product.name}`}
             >
               <Plus size={16} aria-hidden="true" />
-              <span>تحديد التقطيع والوزن</span>
+              <span>{hasCutting ? 'تحديد التقطيع والوزن' : 'تحديد الوزن والطلب'}</span>
             </button>
           ) : (
             <div className="out-of-stock-label" aria-live="polite">

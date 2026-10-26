@@ -4,14 +4,22 @@ export const defaultStoreSettings = {
   slogan: 'عارف يعني ايه لحمة ؟!',
   whatsapp_number: '201000000000',
   is_store_open: true,
+  store_closed_message: 'المتجر مغلق حالياً، نستقبل طلباتكم غداً بدءاً من الساعة 9 صباحاً.',
   delivery_fee: 30,
   min_order_amount: 0,
+  free_delivery_threshold: 0,
+  announcement_enabled: true,
   announcement_banner: 'طازج ومذبوح يومياً بإشراف بيطري كامل — توصيل سريع لجميع المناطق',
+  announcement_theme: 'crimson',
+  announcement_ticker: false,
   address: 'طريق 10، بين بوابة ٥ و بوابة ٦ جمعية عرابي - خلف كارفور العبور، القاهرة',
   maps_url: 'https://maps.app.goo.gl/koT5YPn28VA48SZU7',
   show_hero_banner: true,
+  hero_badge: 'جزارة بلدي 100% — ذبح يومي معتمد',
   hero_title: 'عارف يعني ايه لحمة ؟!',
   hero_description: 'أصول الجزارة البلدي من قلب المذبح. ننتقي لك أنعم القطعيات الطازجة، ونجهزها بتقطيعك المفضل ونوصلها لباب بيتك مباشرة عبر الواتساب.',
+  show_promo_banner: true,
+  promo_banner_custom_text: '',
   discount_enabled: false,
   discount_percent: 10,
   discount_title: 'خصم خاص على أسعار اللحوم البلدي',
@@ -42,11 +50,12 @@ export const isProductDiscountTimeValid = (item) => {
   const now = Date.now();
   if (item.discount_start_date) {
     const start = new Date(item.discount_start_date).getTime();
-    // 15-minute grace window for clock drift or if merchant picked today's hour
-    if (!isNaN(start) && (now + 15 * 60 * 1000) < start) return false;
+    // 30-minute grace window for clock drift or local time discrepancies
+    if (!isNaN(start) && (now + 30 * 60 * 1000) < start) return false;
   }
   if (item.discount_end_date) {
     const end = new Date(item.discount_end_date).getTime();
+    // Allow through the end of the specified minute/day
     if (!isNaN(end) && now > end) return false;
   }
   return true;

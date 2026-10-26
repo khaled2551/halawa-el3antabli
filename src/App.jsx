@@ -149,11 +149,22 @@ export default function App() {
               store_name: cleanEmoji(settingsData.store_name || prev.store_name),
               slogan: cleanEmoji(settingsData.slogan || prev.slogan),
               announcement_banner: cleanEmoji(settingsData.announcement_banner || prev.announcement_banner),
+              announcement_enabled: settingsData.announcement_enabled !== undefined ? settingsData.announcement_enabled : (prev.announcement_enabled !== undefined ? prev.announcement_enabled : true),
+              announcement_theme: settingsData.announcement_theme || prev.announcement_theme || 'crimson',
+              announcement_ticker: settingsData.announcement_ticker !== undefined ? settingsData.announcement_ticker : (prev.announcement_ticker || false),
               show_hero_banner: typeof settingsData.show_hero_banner === 'boolean'
                 ? settingsData.show_hero_banner
                 : (typeof prev.show_hero_banner === 'boolean' ? prev.show_hero_banner : true),
+              hero_badge: settingsData.hero_badge || prev.hero_badge || 'جزارة بلدي 100% — ذبح يومي معتمد',
               hero_title: settingsData.hero_title || prev.hero_title,
               hero_description: settingsData.hero_description || prev.hero_description,
+              show_promo_banner: typeof settingsData.show_promo_banner === 'boolean'
+                ? settingsData.show_promo_banner
+                : (typeof prev.show_promo_banner === 'boolean' ? prev.show_promo_banner : true),
+              promo_banner_custom_text: settingsData.promo_banner_custom_text || prev.promo_banner_custom_text || '',
+              store_closed_message: settingsData.store_closed_message || prev.store_closed_message,
+              min_order_amount: settingsData.min_order_amount !== undefined ? settingsData.min_order_amount : prev.min_order_amount,
+              free_delivery_threshold: settingsData.free_delivery_threshold !== undefined ? settingsData.free_delivery_threshold : prev.free_delivery_threshold,
               maps_url: settingsData.maps_url || prev.maps_url
             };
             try {
@@ -210,6 +221,14 @@ export default function App() {
               const startD = p.discount_start_date || mapEntry?.startDate || existing?.discount_start_date || null;
               const endD = p.discount_end_date || mapEntry?.endDate || existing?.discount_end_date || null;
 
+              const cuttingOpt = p.has_cutting_options !== undefined
+                ? p.has_cutting_options
+                : (existing?.has_cutting_options !== undefined ? existing.has_cutting_options : true);
+
+              const cuts = (p.available_cuts && Array.isArray(p.available_cuts) && p.available_cuts.length > 0)
+                ? p.available_cuts
+                : (existing?.available_cuts && existing.available_cuts.length > 0 ? existing.available_cuts : ['قطعة واحدة كاملة']);
+
               return {
                 ...p,
                 name: cleanEmoji(p.name),
@@ -217,7 +236,9 @@ export default function App() {
                 image_url: (p.image_url && !p.image_url.includes('/assets/products/')) ? p.image_url : null,
                 discount_percent: discountPct,
                 discount_start_date: startD,
-                discount_end_date: endD
+                discount_end_date: endD,
+                has_cutting_options: cuttingOpt,
+                available_cuts: cuts
               };
             });
 
@@ -560,25 +581,38 @@ export default function App() {
 
       {/* Main Store Content */}
       <main className="store-main-content" role="main">
-        {/* Promotional Discount Notice Banner when any products have active discounts */}
-        {discountedProductsCount > 0 && (
+        {/* Store Closed Notice if store is toggled closed */}
+        {storeSettings?.is_store_open === false && (
+          <aside className="store-closed-banner" role="alert" aria-live="polite">
+            <span className="closed-pill">مغلق مؤقتاً</span>
+            <span className="closed-msg">
+              {storeSettings?.store_closed_message || 'المتجر مغلق حالياً، نستقبل طلباتكم غداً بدءاً من الساعة 9 صباحاً.'}
+            </span>
+          </aside>
+        )}
+
+        {/* Promotional Discount Notice Banner (Fully Customizable) */}
+        {storeSettings?.show_promo_banner !== false && discountedProductsCount > 0 && (
           <aside className="storewide-promo-bar" aria-label="عروض وتخفيضات اللحوم">
-            <div className="promo-bar-content">
-              <span className="promo-pill">
+            <div className="promo-bar-inner">
+              <span className="promo-tag">
                 <Percent size={14} aria-hidden="true" />
                 <span>عروض حلاوة العنتبلي</span>
               </span>
-              <strong className="promo-title">
-                تخفيضات خاصة سارية الآن مباشرة على {discountedProductsCount} من قطعيات اللحوم البلدية!
-              </strong>
+              <span className="promo-text">
+                {storeSettings?.promo_banner_custom_text?.trim() || `تخفيضات خاصة سارية الآن مباشرة على ${discountedProductsCount} من قطعيات اللحوم البلدية!`}
+              </span>
             </div>
           </aside>
         )}
 
-        {/* Editorial Hero (Controlled from Admin Dashboard) */}
+        {/* Editorial Hero & Promo Showcase (Controlled from Admin Dashboard) */}
         {storeSettings?.show_hero_banner !== false && (
-          <section className="store-hero" aria-label="مقدمة المتجر">
+          <section className="store-hero" aria-label="مقدمة المتجر وعروضه">
             <div className="hero-text-side">
+              {storeSettings?.hero_badge && (
+                <span className="hero-badge-pill">{storeSettings.hero_badge}</span>
+              )}
               <h2 className="hero-title">
                 {storeSettings?.hero_title || 'عارف يعني ايه لحمة ؟!'}
               </h2>

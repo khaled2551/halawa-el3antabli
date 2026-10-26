@@ -6,8 +6,9 @@ export default function ProductModal({ product, isOpen, onClose, onAddToCart }) 
 
   const defaultWeights = [0.25, 0.5, 1, 1.5, 2, 3];
   const [weight, setWeight] = useState(1);
+  const hasCutting = product.has_cutting_options !== false && Boolean(product.available_cuts && product.available_cuts.length > 0);
   const [selectedCut, setSelectedCut] = useState(
-    product.available_cuts?.[0] || 'قطعة واحدة متماسكة'
+    hasCutting ? (product.available_cuts?.[0] || 'سليم كامل') : 'سليم بدون تقطيع'
   );
   const [selectedFat, setSelectedFat] = useState(
     product.fat_options?.[0] || 'أحمر صافي'
@@ -38,7 +39,7 @@ export default function ProductModal({ product, isOpen, onClose, onAddToCart }) 
       discount_percent: product.discountPercent || 0,
       discount_title: product.discountTitle || '',
       weight: weight,
-      cutStyle: selectedCut,
+      cutStyle: hasCutting ? selectedCut : 'سليم بدون تقطيع',
       fatOption: selectedFat,
       note: customNote.trim(),
       totalPrice: totalPrice,
@@ -168,7 +169,7 @@ export default function ProductModal({ product, isOpen, onClose, onAddToCart }) 
           </section>
 
           {/* Cutting Style Section */}
-          {product.available_cuts && product.available_cuts.length > 0 && (
+          {hasCutting && (
             <section className="modal-section" aria-labelledby="section-cuts-title">
               <span id="section-cuts-title" className="section-title">
                 <Scissors size={15} className="section-icon" aria-hidden="true" />

@@ -77,26 +77,39 @@ export default function AdminDashboard({
   const [isApplyingDiscounts, setIsApplyingDiscounts] = useState(false);
   const [discountActionFeedback, setDiscountActionFeedback] = useState(null);
 
-  // Edit Product Modal Discount State
+  // Edit Product Modal Discount & Cutting State
   const [editProdDiscountEnabled, setEditProdDiscountEnabled] = useState(false);
   const [editProdDiscountPercent, setEditProdDiscountPercent] = useState(10);
   const [editProdDiscountStartDate, setEditProdDiscountStartDate] = useState('');
   const [editProdDiscountEndDate, setEditProdDiscountEndDate] = useState('');
+  const [editProdHasCutting, setEditProdHasCutting] = useState(true);
+  const [editProdCuts, setEditProdCuts] = useState([]);
+  const [editProdCutInput, setEditProdCutInput] = useState('');
   
-  // Settings Form State
+  // Settings Form State (Comprehensive Control Center)
   const [whatsappNumber, setWhatsappNumber] = useState(storeSettings?.whatsapp_number || '201000000000');
   const [storeName, setStoreName] = useState(storeSettings?.store_name || 'حلاوة العنتبلي');
   const [slogan, setSlogan] = useState(storeSettings?.slogan || 'عارف يعني ايه لحمة ؟!');
   const [storeAddress, setStoreAddress] = useState(storeSettings?.address || 'القاهرة، مصر');
   const [mapsUrl, setMapsUrl] = useState(storeSettings?.maps_url || 'https://maps.app.goo.gl/koT5YPn28VA48SZU7');
+  const [logoUrl, setLogoUrl] = useState(storeSettings?.logo_url || '/assets/logo.jpg');
   const [deliveryFee, setDeliveryFee] = useState(storeSettings?.delivery_fee ?? 30);
+  const [minOrderAmount, setMinOrderAmount] = useState(storeSettings?.min_order_amount ?? 0);
+  const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState(storeSettings?.free_delivery_threshold ?? 0);
   const [announcement, setAnnouncement] = useState(storeSettings?.announcement_banner || '');
+  const [announcementEnabled, setAnnouncementEnabled] = useState(storeSettings?.announcement_enabled !== false);
+  const [announcementTheme, setAnnouncementTheme] = useState(storeSettings?.announcement_theme || 'crimson');
+  const [announcementTicker, setAnnouncementTicker] = useState(storeSettings?.announcement_ticker || false);
   const [isStoreOpen, setIsStoreOpen] = useState(storeSettings?.is_store_open ?? true);
+  const [storeClosedMessage, setStoreClosedMessage] = useState(storeSettings?.store_closed_message || 'المتجر مغلق حالياً، نستقبل طلباتكم غداً بدءاً من الساعة 9 صباحاً.');
   const [showHeroBanner, setShowHeroBanner] = useState(storeSettings?.show_hero_banner !== false);
+  const [heroBadge, setHeroBadge] = useState(storeSettings?.hero_badge || 'جزارة بلدي 100% — ذبح يومي معتمد');
   const [heroTitle, setHeroTitle] = useState(storeSettings?.hero_title || 'عارف يعني ايه لحمة ؟!');
   const [heroDescription, setHeroDescription] = useState(
     storeSettings?.hero_description || 'أصول الجزارة البلدي من قلب المذبح. ننتقي لك أنعم القطعيات الطازجة، ونجهزها بتقطيعك المفضل ونوصلها لباب بيتك مباشرة عبر الواتساب.'
   );
+  const [showPromoBanner, setShowPromoBanner] = useState(storeSettings?.show_promo_banner !== false);
+  const [promoBannerCustomText, setPromoBannerCustomText] = useState(storeSettings?.promo_banner_custom_text || '');
   const [settingsSavedMessage, setSettingsSavedMessage] = useState(false);
   const [newPinInput, setNewPinInput] = useState('');
   const [confirmPinInput, setConfirmPinInput] = useState('');
@@ -132,6 +145,9 @@ export default function AdminDashboard({
   const [newProdImagePreview, setNewProdImagePreview] = useState(null);
   const [isUploadingNewProd, setIsUploadingNewProd] = useState(false);
   const [newProdDesc, setNewProdDesc] = useState('');
+  const [newProdHasCutting, setNewProdHasCutting] = useState(true);
+  const [newProdCuts, setNewProdCuts] = useState(['قطع كباب حلة', 'مكعبات خضار', 'سلق للشوربة']);
+  const [newProdCutInput, setNewProdCutInput] = useState('');
 
   // Orders State (Loaded immediately from LocalStorage + Supabase sync)
   const [orders, setOrders] = useState(() => {
@@ -152,14 +168,24 @@ export default function AdminDashboard({
       setSlogan(storeSettings.slogan || 'عارف يعني ايه لحمة ؟!');
       setStoreAddress(storeSettings.address || 'القاهرة، مصر');
       setMapsUrl(storeSettings.maps_url || 'https://maps.app.goo.gl/koT5YPn28VA48SZU7');
+      setLogoUrl(storeSettings.logo_url || '/assets/logo.jpg');
       setDeliveryFee(storeSettings.delivery_fee ?? 30);
+      setMinOrderAmount(storeSettings.min_order_amount ?? 0);
+      setFreeDeliveryThreshold(storeSettings.free_delivery_threshold ?? 0);
       setAnnouncement(storeSettings.announcement_banner || '');
+      setAnnouncementEnabled(storeSettings.announcement_enabled !== false);
+      setAnnouncementTheme(storeSettings.announcement_theme || 'crimson');
+      setAnnouncementTicker(storeSettings.announcement_ticker || false);
       setIsStoreOpen(storeSettings.is_store_open ?? true);
+      setStoreClosedMessage(storeSettings.store_closed_message || 'المتجر مغلق حالياً، نستقبل طلباتكم غداً بدءاً من الساعة 9 صباحاً.');
       setShowHeroBanner(storeSettings.show_hero_banner !== false);
+      setHeroBadge(storeSettings.hero_badge || 'جزارة بلدي 100% — ذبح يومي معتمد');
       setHeroTitle(storeSettings.hero_title || 'عارف يعني ايه لحمة ؟!');
       setHeroDescription(
         storeSettings.hero_description || 'أصول الجزارة البلدي من قلب المذبح. ننتقي لك أنعم القطعيات الطازجة، ونجهزها بتقطيعك المفضل ونوصلها لباب بيتك مباشرة عبر الواتساب.'
       );
+      setShowPromoBanner(storeSettings.show_promo_banner !== false);
+      setPromoBannerCustomText(storeSettings.promo_banner_custom_text || '');
     }
   }, [storeSettings]);
 
@@ -468,13 +494,28 @@ export default function AdminDashboard({
       slogan: slogan.trim(),
       address: storeAddress.trim(),
       maps_url: mapsUrl.trim() || 'https://maps.app.goo.gl/koT5YPn28VA48SZU7',
+      logo_url: logoUrl.trim() || '/assets/logo.jpg',
       delivery_fee: Number(deliveryFee),
+      min_order_amount: Number(minOrderAmount) || 0,
+      free_delivery_threshold: Number(freeDeliveryThreshold) || 0,
       announcement_banner: announcement.trim(),
+      announcement_enabled: announcementEnabled,
+      announcement_theme: announcementTheme,
+      announcement_ticker: announcementTicker,
       is_store_open: isStoreOpen,
+      store_closed_message: storeClosedMessage.trim(),
       show_hero_banner: showHeroBanner,
+      hero_badge: heroBadge.trim(),
       hero_title: heroTitle.trim(),
-      hero_description: heroDescription.trim()
+      hero_description: heroDescription.trim(),
+      show_promo_banner: showPromoBanner,
+      promo_banner_custom_text: promoBannerCustomText.trim()
     };
+
+    // Keep discount_title intact so discounts are never lost
+    if (storeSettings?.discount_title) {
+      updated.discount_title = storeSettings.discount_title;
+    }
 
     // Handle optional PIN change
     if (newPinInput.trim()) {
@@ -499,16 +540,16 @@ export default function AdminDashboard({
 
     onUpdateSettings(updated);
 
-    // Save to Supabase (with fallback to core columns if new columns don't exist yet)
+    // Save to Supabase via update to avoid overwriting unmentioned columns
     try {
       const { error } = await supabase
         .from('store_settings')
-        .upsert({ id: 'main_config', ...updated });
+        .update(updated)
+        .eq('id', 'main_config');
 
       if (error) {
-        console.warn('Full settings upsert notice, using core fallback:', error.message);
+        console.warn('Full settings update notice, using core fallback:', error.message);
         const corePayload = {
-          id: 'main_config',
           whatsapp_number: cleanNumber,
           store_name: storeName.trim(),
           slogan: slogan.trim(),
@@ -517,7 +558,7 @@ export default function AdminDashboard({
           announcement_banner: announcement.trim(),
           is_store_open: isStoreOpen
         };
-        await supabase.from('store_settings').upsert(corePayload);
+        await supabase.from('store_settings').update(corePayload).eq('id', 'main_config');
       }
     } catch (err) {
       console.warn('Settings supabase sync:', err);
@@ -630,6 +671,12 @@ export default function AdminDashboard({
     setEditProdImageFile(null);
     setEditProdImagePreview(cleanImg || null);
 
+    // Cutting options state
+    const hasCutting = product.has_cutting_options !== false && Boolean(product.available_cuts && product.available_cuts.length > 0);
+    setEditProdHasCutting(hasCutting);
+    setEditProdCuts(hasCutting && Array.isArray(product.available_cuts) ? [...product.available_cuts] : ['قطع كباب حلة', 'مكعبات خضار', 'سلق للشوربة']);
+    setEditProdCutInput('');
+
     // Product-specific discount state
     const hasDiscount = Boolean(product.discount_percent && Number(product.discount_percent) > 0);
     setEditProdDiscountEnabled(hasDiscount);
@@ -673,6 +720,8 @@ export default function AdminDashboard({
         category: editProdCategory,
         image_url: finalImageUrl,
         description: editProdDesc.trim() || '',
+        has_cutting_options: editProdHasCutting,
+        available_cuts: editProdHasCutting ? editProdCuts.filter((c) => Boolean(c && c.trim())) : [],
         discount_percent: editProdDiscountEnabled ? Number(editProdDiscountPercent) : null,
         discount_start_date: (editProdDiscountEnabled && editProdDiscountStartDate) ? editProdDiscountStartDate : null,
         discount_end_date: (editProdDiscountEnabled && editProdDiscountEndDate) ? editProdDiscountEndDate : null
@@ -752,7 +801,8 @@ export default function AdminDashboard({
         image_url: finalImageUrl,
         badge: null,
         description: newProdDesc.trim() || 'لحم بلدي طازج من أفضل القطعيات اليومية المختارة بعناية فائقة',
-        available_cuts: ['مكعبات وسط', 'قطع سلق', 'مفروم'],
+        has_cutting_options: newProdHasCutting,
+        available_cuts: newProdHasCutting ? newProdCuts.filter((c) => Boolean(c && c.trim())) : [],
         fat_options: ['أحمر صافي', 'ملبس وسط'],
         is_in_stock: true,
         is_featured: false
@@ -1311,10 +1361,23 @@ export default function AdminDashboard({
                       value={batchDiscountPercent}
                       onChange={(e) => setBatchDiscountPercent(e.target.value)}
                       required
+                      placeholder="10"
                       className="tabular-nums"
                     />
                   </div>
-                  <span className="field-hint">مثال: 10 يعني تخفيض 10% من سعر الكيلو لكل صنف محدد.</span>
+                  <div className="discount-presets-strip" aria-label="نسب خصم سريعة">
+                    {[5, 10, 15, 20, 25, 30].map((pctVal) => (
+                      <button
+                        key={pctVal}
+                        type="button"
+                        className={`discount-preset-btn ${Number(batchDiscountPercent) === pctVal ? 'active' : ''}`}
+                        onClick={() => setBatchDiscountPercent(pctVal)}
+                      >
+                        خصم {pctVal}%
+                      </button>
+                    ))}
+                  </div>
+                  <span className="field-hint">اختر نسبة من الأزرار أو اكتب النسبة المباشرة لتخفيض سعر الكيلو لكل صنف محدد.</span>
                 </div>
 
                 <div className="form-group">
@@ -1482,73 +1545,197 @@ export default function AdminDashboard({
           <section className="admin-tab-pane" aria-labelledby="settings-heading">
             <form className="admin-clean-form" onSubmit={handleSaveSettings}>
               <div className="form-legend">
-                <h2 id="settings-heading" className="pane-heading">إعدادات الاتصال واستقبال الطلبات</h2>
-                <p className="pane-subheading">تحديد رقم الواتساب الذي يستقبل رسائل فواتير العملاء.</p>
+                <h2 id="settings-heading" className="pane-heading">مركز التحكم الشامل وتخصيص المتجر</h2>
+                <p className="pane-subheading">تحكم كامل في هوية المتجر، الأشرطة الإعلانية، شاشة العروض، شروط التوصيل، ورقم الواتساب.</p>
               </div>
 
-              {/* WhatsApp Receiver Field */}
-              <div className="form-group primary-highlight">
-                <label htmlFor="admin-whatsapp-number">
-                  رقم الواتساب المستلم للطلبات: *
-                  <span className="hint-text">(اكتب الرقم بكود الدولة بدون علامة + وبدون مسافات، مثال: 201012345678)</span>
-                </label>
-                <div className="input-with-icon">
-                  <Phone size={18} className="field-icon" aria-hidden="true" />
-                  <input
-                    id="admin-whatsapp-number"
-                    type="tel"
-                    value={whatsappNumber}
-                    onChange={(e) => setWhatsappNumber(e.target.value)}
-                    placeholder="201012345678"
-                    required
-                  />
+              {/* SECTION 1: STORE BRAND & IDENTITY */}
+              <div className="admin-settings-section">
+                <div className="settings-section-title-wrap">
+                  <Store size={18} className="gold-accent-icon" aria-hidden="true" />
+                  <h3 className="settings-section-heading">هوية وبيانات المتجر الأساسية</h3>
                 </div>
-                <p className="field-instruction">
-                  توجيه جميع طلبات سلة العملاء مباشرة إلى هذا الرقم كفاتورة إلكترونية مفصلة.
-                </p>
+                <p className="settings-section-desc">اسم المتجر، الشعار الترويجي، ورقم الواتساب الذي يستقبل رسائل فواتير العملاء.</p>
+
+                <div className="form-two-cols">
+                  <div className="form-group">
+                    <label htmlFor="admin-store-name">اسم المتجر / العلامة التجارية: *</label>
+                    <input
+                      id="admin-store-name"
+                      type="text"
+                      value={storeName}
+                      onChange={(e) => setStoreName(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="admin-slogan">الشعار (السلوجان):</label>
+                    <input
+                      id="admin-slogan"
+                      type="text"
+                      value={slogan}
+                      onChange={(e) => setSlogan(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-two-cols">
+                  <div className="form-group primary-highlight">
+                    <label htmlFor="admin-whatsapp-number">
+                      رقم الواتساب المستلم للطلبات: *
+                      <span className="hint-text">(بكود الدولة بدون + مثال: 201012345678)</span>
+                    </label>
+                    <div className="input-with-icon">
+                      <Phone size={18} className="field-icon" aria-hidden="true" />
+                      <input
+                        id="admin-whatsapp-number"
+                        type="tel"
+                        value={whatsappNumber}
+                        onChange={(e) => setWhatsappNumber(e.target.value)}
+                        placeholder="201012345678"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="admin-logo-url">رابط صورة الشعار (Logo URL):</label>
+                    <input
+                      id="admin-logo-url"
+                      type="text"
+                      value={logoUrl}
+                      onChange={(e) => setLogoUrl(e.target.value)}
+                      placeholder="/assets/logo.jpg"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-two-cols">
+                  <div className="form-group">
+                    <label htmlFor="admin-store-address">عنوان الفرع الرئيسي للجزارة (للاستلام من الفرع):</label>
+                    <div className="input-with-icon">
+                      <Store size={18} className="field-icon" aria-hidden="true" />
+                      <input
+                        id="admin-store-address"
+                        type="text"
+                        value={storeAddress}
+                        onChange={(e) => setStoreAddress(e.target.value)}
+                        placeholder="طريق 10، جمعية عرابي - خلف كارفور العبور، القاهرة"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="admin-maps-url">رابط موقع الفرع على خرائط جوجل (Google Maps URL):</label>
+                    <div className="input-with-icon">
+                      <MapPin size={18} className="field-icon" aria-hidden="true" />
+                      <input
+                        id="admin-maps-url"
+                        type="url"
+                        value={mapsUrl}
+                        onChange={(e) => setMapsUrl(e.target.value)}
+                        placeholder="https://maps.app.goo.gl/koT5YPn28VA48SZU7"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* HERO BANNER EDIT & TOGGLE SECTION */}
-              <div className="admin-hero-control-card">
-                <div className="hero-control-header">
-                  <div className="hero-control-meta">
-                    <div className="hero-icon-title">
-                      <Sparkles size={20} className="gold-accent-icon" aria-hidden="true" />
-                      <h3 className="hero-control-heading">قسم الواجهة الترحيبية أعلى المتجر (Hero Banner)</h3>
-                    </div>
-                    <p className="hero-control-desc">
-                      يمكنك تعديل نصوص قسم ("عارف يعني ايه لحمة ؟!") أو إخفائه بالكامل من المتجر في أي وقت.
-                    </p>
-                  </div>
+              {/* SECTION 2: TOP ANNOUNCEMENT BAR */}
+              <div className="admin-settings-section">
+                <div className="settings-section-title-wrap">
+                  <Megaphone size={18} className="gold-accent-icon" aria-hidden="true" />
+                  <h3 className="settings-section-heading">شريط الإعلانات الترويجي العلوي (Announcement Bar)</h3>
+                </div>
+                <p className="settings-section-desc">الشريط العريض في أعلى الشاشة لعرض التنبيهات، مواعيد العمل، أو مناطق التوصيل.</p>
 
-                  <div className="hero-toggle-area">
-                    <label className="hero-toggle-pill" htmlFor="hero-banner-switch">
+                <div className="hero-toggle-area">
+                  <label className="checkbox-label-toggle" htmlFor="announcement-enable-toggle">
+                    <input
+                      id="announcement-enable-toggle"
+                      type="checkbox"
+                      checked={announcementEnabled}
+                      onChange={(e) => setAnnouncementEnabled(e.target.checked)}
+                    />
+                    <span>تفعيل وإظهار شريط الإعلانات أعلى المتجر</span>
+                  </label>
+                </div>
+
+                {announcementEnabled && (
+                  <div className="form-two-cols">
+                    <div className="form-group">
+                      <label htmlFor="admin-announcement-text">نص الإعلان الترويجي:</label>
                       <input
-                        id="hero-banner-switch"
-                        type="checkbox"
-                        className="hero-switch-input"
-                        checked={showHeroBanner}
-                        onChange={(e) => handleToggleHeroBanner(e.target.checked)}
+                        id="admin-announcement-text"
+                        type="text"
+                        value={announcement}
+                        onChange={(e) => setAnnouncement(e.target.value)}
+                        placeholder="طازج ومذبوح يومياً بإشراف بيطري كامل — توصيل سريع لمنطقة العبور فقط"
                       />
-                      <span className="hero-toggle-indicator">
-                        {showHeroBanner ? (
-                          <>
-                            <Eye size={15} aria-hidden="true" />
-                            <span>معروض في المتجر</span>
-                          </>
-                        ) : (
-                          <>
-                            <EyeOff size={15} aria-hidden="true" />
-                            <span>مخفي من المتجر</span>
-                          </>
-                        )}
-                      </span>
-                    </label>
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="admin-announcement-theme">لون وشكل الشريط:</label>
+                      <select
+                        id="admin-announcement-theme"
+                        value={announcementTheme}
+                        onChange={(e) => setAnnouncementTheme(e.target.value)}
+                      >
+                        <option value="crimson">أحمر المذبح الملكي (Crimson Red)</option>
+                        <option value="gold">أسود بلمسة ذهبية فاخرة (Black & Gold)</option>
+                        <option value="black">أسود داكن كلاسيكي (Deep Onyx)</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="checkbox-label-toggle" htmlFor="announcement-ticker-toggle">
+                        <input
+                          id="announcement-ticker-toggle"
+                          type="checkbox"
+                          checked={announcementTicker}
+                          onChange={(e) => setAnnouncementTicker(e.target.checked)}
+                        />
+                        <span>تأثير الشريط المتحرك المستمر (Marquee Ticker Animation)</span>
+                      </label>
+                    </div>
                   </div>
+                )}
+              </div>
+
+              {/* SECTION 3: HERO & PROMO SHOWCASE */}
+              <div className="admin-settings-section">
+                <div className="settings-section-title-wrap">
+                  <Sparkles size={18} className="gold-accent-icon" aria-hidden="true" />
+                  <h3 className="settings-section-heading">شاشة وعروض الواجهة والمقدمة (Hero & Promo Banner)</h3>
+                </div>
+                <p className="settings-section-desc">قسم الواجهة الترحيبية ("عارف يعني ايه لحمة ؟!") وأسفلها الوصف الترويجي المميز.</p>
+
+                <div className="hero-toggle-area">
+                  <label className="checkbox-label-toggle" htmlFor="hero-banner-switch">
+                    <input
+                      id="hero-banner-switch"
+                      type="checkbox"
+                      checked={showHeroBanner}
+                      onChange={(e) => setShowHeroBanner(e.target.checked)}
+                    />
+                    <span>إظهار شاشة العروض والواجهة في المتجر</span>
+                  </label>
                 </div>
 
                 {showHeroBanner && (
                   <div className="hero-fields-grid">
+                    <div className="form-group">
+                      <label htmlFor="admin-hero-badge">شارة العرض الترويجية (Badge Tag):</label>
+                      <input
+                        id="admin-hero-badge"
+                        type="text"
+                        value={heroBadge}
+                        onChange={(e) => setHeroBadge(e.target.value)}
+                        placeholder="جزارة بلدي 100% — ذبح يومي معتمد"
+                      />
+                    </div>
+
                     <div className="form-group">
                       <label htmlFor="admin-hero-title">العنوان الترحيبي الرئيسي (Hero Title):</label>
                       <input
@@ -1575,6 +1762,7 @@ export default function AdminDashboard({
                     <div className="hero-live-preview-box">
                       <span className="preview-tag">معاينة مباشرة كما تظهر للعميل في واجهة المتجر:</span>
                       <div className="preview-hero-content">
+                        {heroBadge && <span className="hero-badge-pill">{heroBadge}</span>}
                         <h4 className="preview-title">{heroTitle || 'عارف يعني ايه لحمة ؟!'}</h4>
                         <p className="preview-desc">
                           {heroDescription || 'أصول الجزارة البلدي من قلب المذبح. ننتقي لك أنعم القطعيات الطازجة، ونجهزها بتقطيعك المفضل ونوصلها لباب بيتك مباشرة عبر الواتساب.'}
@@ -1585,102 +1773,117 @@ export default function AdminDashboard({
                 )}
               </div>
 
-              {/* Store Name & Slogan */}
-              <div className="form-two-cols">
-                <div className="form-group">
-                  <label htmlFor="admin-store-name">اسم المتجر / العلامة التجارية:</label>
-                  <input
-                    id="admin-store-name"
-                    type="text"
-                    value={storeName}
-                    onChange={(e) => setStoreName(e.target.value)}
-                    required
-                  />
+              {/* SECTION 4: PRODUCT DISCOUNTS PROMO BAR */}
+              <div className="admin-settings-section">
+                <div className="settings-section-title-wrap">
+                  <Percent size={18} className="gold-accent-icon" aria-hidden="true" />
+                  <h3 className="settings-section-heading">شريط تنبيه الخصومات والعروض السارية (Discounts Bar)</h3>
+                </div>
+                <p className="settings-section-desc">شريط ذهبي مميز يظهر تلقائياً أعلى المنتجات عند وجود أي قطعيات مخفضة بالمتجر.</p>
+
+                <div className="hero-toggle-area">
+                  <label className="checkbox-label-toggle" htmlFor="promo-bar-enable-switch">
+                    <input
+                      id="promo-bar-enable-switch"
+                      type="checkbox"
+                      checked={showPromoBanner}
+                      onChange={(e) => setShowPromoBanner(e.target.checked)}
+                    />
+                    <span>إظهار شريط تنبيه التخفيضات أعلى المنتجات عند وجود عروض</span>
+                  </label>
                 </div>
 
-                <div className="form-group">
-                  <label htmlFor="admin-slogan">الشعار (السلوجان):</label>
-                  <input
-                    id="admin-slogan"
-                    type="text"
-                    value={slogan}
-                    onChange={(e) => setSlogan(e.target.value)}
-                  />
-                </div>
+                {showPromoBanner && (
+                  <div className="form-group">
+                    <label htmlFor="admin-promo-custom-text">
+                      نص مخصص لشريط العروض (اختياري):
+                      <span className="hint-text">(اتركه فارغاً ليقوم النظام بعد الأصناف المخفضة تلقائياً)</span>
+                    </label>
+                    <input
+                      id="admin-promo-custom-text"
+                      type="text"
+                      value={promoBannerCustomText}
+                      onChange={(e) => setPromoBannerCustomText(e.target.value)}
+                      placeholder="مثال: عروض نهاية الأسبوع — تخفيضات كبرى على قطعيات اللحوم البلدية!"
+                    />
+                  </div>
+                )}
               </div>
 
-              {/* Delivery Fee & Store Open Status */}
-              <div className="form-two-cols">
-                <div className="form-group">
-                  <label htmlFor="admin-delivery-fee">رسوم التوصيل الافتراضية (ج.م):</label>
-                  <div className="input-with-icon">
-                    <Truck size={18} className="field-icon" aria-hidden="true" />
+              {/* SECTION 5: DELIVERY & WORKING HOURS */}
+              <div className="admin-settings-section">
+                <div className="settings-section-title-wrap">
+                  <Truck size={18} className="gold-accent-icon" aria-hidden="true" />
+                  <h3 className="settings-section-heading">شروط التوصيل وحالة المتجر</h3>
+                </div>
+
+                <div className="form-two-cols">
+                  <div className="form-group">
+                    <label htmlFor="admin-store-status">حالة المتجر الآن:</label>
+                    <select
+                      id="admin-store-status"
+                      value={isStoreOpen ? 'open' : 'closed'}
+                      onChange={(e) => handleStoreStatusChange(e.target.value === 'open')}
+                    >
+                      <option value="open">المتجر مفتوح ويستقبل الطلبات فوراً</option>
+                      <option value="closed">المتجر مغلق مؤقتاً</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="admin-delivery-fee">رسوم التوصيل الافتراضية (ج.م):</label>
+                    <div className="input-with-icon">
+                      <Truck size={18} className="field-icon" aria-hidden="true" />
+                      <input
+                        id="admin-delivery-fee"
+                        type="number"
+                        min="0"
+                        step="5"
+                        value={deliveryFee}
+                        onChange={(e) => setDeliveryFee(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-two-cols">
+                  <div className="form-group">
+                    <label htmlFor="admin-min-order">الحد الأدنى لقيمة الطلب (ج.م):</label>
                     <input
-                      id="admin-delivery-fee"
+                      id="admin-min-order"
                       type="number"
                       min="0"
-                      step="5"
-                      value={deliveryFee}
-                      onChange={(e) => setDeliveryFee(e.target.value)}
+                      value={minOrderAmount}
+                      onChange={(e) => setMinOrderAmount(e.target.value)}
+                      placeholder="0 يعني بدون حد أدنى"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="admin-free-delivery">توصيل مجاني للطلبات فوق (ج.م):</label>
+                    <input
+                      id="admin-free-delivery"
+                      type="number"
+                      min="0"
+                      value={freeDeliveryThreshold}
+                      onChange={(e) => setFreeDeliveryThreshold(e.target.value)}
+                      placeholder="0 يعني بدون توصيل مجاني تلقائي"
                     />
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label htmlFor="admin-store-status">حالة المتجر الآن:</label>
-                  <select
-                    id="admin-store-status"
-                    value={isStoreOpen ? 'open' : 'closed'}
-                    onChange={(e) => handleStoreStatusChange(e.target.value === 'open')}
-                  >
-                    <option value="open">المتجر مفتوح ويستقبل الطلبات</option>
-                    <option value="closed">المتجر مغلق مؤقتاً</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Store / Branch Address */}
-              <div className="form-group">
-                <label htmlFor="admin-store-address">عنوان الفرع الرئيسي للجزارة (للاستلام من الفرع):</label>
-                <div className="input-with-icon">
-                  <Store size={18} className="field-icon" aria-hidden="true" />
-                  <input
-                    id="admin-store-address"
-                    type="text"
-                    value={storeAddress}
-                    onChange={(e) => setStoreAddress(e.target.value)}
-                    placeholder="مثال: القاهرة، مصر — شارع التحرير، الدقي"
-                  />
-                </div>
-                <small className="field-hint">يظهر هذا العنوان للعملاء عند اختيار طريقة (الاستلام من الفرع).</small>
-              </div>
-
-              {/* Store / Branch Google Maps Location URL */}
-              <div className="form-group">
-                <label htmlFor="admin-maps-url">رابط موقع الفرع على خرائط جوجل (Google Maps URL):</label>
-                <div className="input-with-icon">
-                  <MapPin size={18} className="field-icon" aria-hidden="true" />
-                  <input
-                    id="admin-maps-url"
-                    type="url"
-                    value={mapsUrl}
-                    onChange={(e) => setMapsUrl(e.target.value)}
-                    placeholder="https://maps.app.goo.gl/koT5YPn28VA48SZU7"
-                  />
-                </div>
-                <small className="field-hint">رابط اللوكيشن الذي يفتح خريطة Google Maps للعميل عند اختيار الاستلام من الفرع وفي رسالة الواتساب.</small>
-              </div>
-
-              {/* Announcement Banner */}
-              <div className="form-group">
-                <label htmlFor="admin-announcement">شريط الإعلانات الترويجي أعلى المتجر:</label>
-                <input
-                  id="admin-announcement"
-                  type="text"
-                  value={announcement}
-                  onChange={(e) => setAnnouncement(e.target.value)}
-                  placeholder="طازج ومذبوح يومياً بإشراف بيطري كامل — توصيل سريع لجميع المناطق"
-                />
+                {!isStoreOpen && (
+                  <div className="form-group">
+                    <label htmlFor="admin-store-closed-msg">رسالة تظهر للعملاء عند إغلاق المتجر:</label>
+                    <textarea
+                      id="admin-store-closed-msg"
+                      rows="2"
+                      value={storeClosedMessage}
+                      onChange={(e) => setStoreClosedMessage(e.target.value)}
+                      placeholder="المتجر مغلق حالياً، نستقبل طلباتكم غداً بدءاً من الساعة 9 صباحاً."
+                    />
+                  </div>
+                )}
               </div>
 
               {/* ADMIN SECURITY & PIN CARD */}
@@ -1739,13 +1942,13 @@ export default function AdminDashboard({
               <div className="form-submit-row">
                 <button type="submit" className="admin-submit-btn">
                   <Save size={17} aria-hidden="true" />
-                  <span>حفظ التعديلات والإعدادات</span>
+                  <span>حفظ التعديلات والإعدادات بالكامل</span>
                 </button>
 
                 {settingsSavedMessage && (
                   <span className="save-success-tag" role="status" aria-live="polite">
                     <Check size={16} aria-hidden="true" />
-                    <span>تم حفظ الإعدادات وتحديث المتجر بنجاح!</span>
+                    <span>تم حفظ كافة الإعدادات وتحديث المتجر بنجاح!</span>
                   </span>
                 )}
               </div>
@@ -1999,6 +2202,95 @@ export default function AdminDashboard({
                       ))}
                     </select>
                   </div>
+                </div>
+
+                {/* Cutting Options Toggle & Manager */}
+                <div className="product-cutting-manager-card">
+                  <div className="cutting-toggle-header">
+                    <div className="toggle-info">
+                      <label htmlFor="new-prod-has-cutting" className="cutting-label-bold">
+                        هل يتوفر خيارات تقطيع لهذا الصنف؟
+                      </label>
+                      <span className="cutting-desc-hint">
+                        فعّل هذا الخيار إذا كان الصنف يقبل التقطيع (مثل اللحوم والموز والاستيك)، أو عطّله إذا كان الصنف مجهزاً مسبقاً (مثل المصنعات أو السجق أو البرجر أو عجين الحواوشي).
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      id="new-prod-has-cutting"
+                      checked={newProdHasCutting}
+                      onChange={(e) => setNewProdHasCutting(e.target.checked)}
+                      className="styled-toggle-checkbox"
+                    />
+                  </div>
+
+                  {newProdHasCutting && (
+                    <div className="cutting-tags-container">
+                      <div className="cuts-tag-list">
+                        {newProdCuts.map((cut, idx) => (
+                          <span key={idx} className="cutting-tag-chip">
+                            <span>{cut}</span>
+                            <button
+                              type="button"
+                              className="remove-cut-btn"
+                              onClick={() => setNewProdCuts((prev) => prev.filter((_, i) => i !== idx))}
+                              aria-label={`حذف تقطيع ${cut}`}
+                            >
+                              <X size={12} aria-hidden="true" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+
+                      <div className="add-cut-input-row">
+                        <input
+                          type="text"
+                          placeholder="اكتب خيار تقطيع جديد (مثلاً: شرائح بفتيك مدقوق، مكعبات كباب حلة...)"
+                          value={newProdCutInput}
+                          onChange={(e) => setNewProdCutInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (newProdCutInput.trim() && !newProdCuts.includes(newProdCutInput.trim())) {
+                                setNewProdCuts((prev) => [...prev, newProdCutInput.trim()]);
+                                setNewProdCutInput('');
+                              }
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="add-cut-btn"
+                          onClick={() => {
+                            if (newProdCutInput.trim() && !newProdCuts.includes(newProdCutInput.trim())) {
+                              setNewProdCuts((prev) => [...prev, newProdCutInput.trim()]);
+                              setNewProdCutInput('');
+                            }
+                          }}
+                        >
+                          <Plus size={14} aria-hidden="true" />
+                          <span>إضافة خيار</span>
+                        </button>
+                      </div>
+
+                      <div className="quick-presets-row">
+                        <span className="presets-label">خيارات تقطيع شائعة للإضافة بنقرة واحدة:</span>
+                        <div className="presets-chips">
+                          {['قطع كباب حلة', 'مكعبات خضار', 'سلق للشوربة', 'شرائح ستيك', 'بفتيك مدقوق', 'شاورما', 'فرم وش واحد', 'فرم وشين', 'سليم بدون تقطيع'].map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              className={`preset-chip-btn ${newProdCuts.includes(preset) ? 'disabled' : ''}`}
+                              disabled={newProdCuts.includes(preset)}
+                              onClick={() => setNewProdCuts((prev) => [...prev, preset])}
+                            >
+                              + {preset}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* SUPABASE STORAGE IMAGE UPLOAD SECTION */}
@@ -2275,6 +2567,95 @@ export default function AdminDashboard({
                       ))}
                     </select>
                   </div>
+                </div>
+
+                {/* Cutting Options Toggle & Manager */}
+                <div className="product-cutting-manager-card">
+                  <div className="cutting-toggle-header">
+                    <div className="toggle-info">
+                      <label htmlFor="edit-prod-has-cutting" className="cutting-label-bold">
+                        هل يتوفر خيارات تقطيع لهذا الصنف؟
+                      </label>
+                      <span className="cutting-desc-hint">
+                        فعّل هذا الخيار إذا كان الصنف يقبل التقطيع (مثل اللحوم والموز والاستيك)، أو عطّله إذا كان الصنف مجهزاً مسبقاً (مثل المصنعات أو السجق أو البرجر أو عجين الحواوشي).
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      id="edit-prod-has-cutting"
+                      checked={editProdHasCutting}
+                      onChange={(e) => setEditProdHasCutting(e.target.checked)}
+                      className="styled-toggle-checkbox"
+                    />
+                  </div>
+
+                  {editProdHasCutting && (
+                    <div className="cutting-tags-container">
+                      <div className="cuts-tag-list">
+                        {editProdCuts.map((cut, idx) => (
+                          <span key={idx} className="cutting-tag-chip">
+                            <span>{cut}</span>
+                            <button
+                              type="button"
+                              className="remove-cut-btn"
+                              onClick={() => setEditProdCuts((prev) => prev.filter((_, i) => i !== idx))}
+                              aria-label={`حذف تقطيع ${cut}`}
+                            >
+                              <X size={12} aria-hidden="true" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+
+                      <div className="add-cut-input-row">
+                        <input
+                          type="text"
+                          placeholder="اكتب خيار تقطيع جديد (مثلاً: شرائح بفتيك مدقوق، مكعبات كباب حلة...)"
+                          value={editProdCutInput}
+                          onChange={(e) => setEditProdCutInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (editProdCutInput.trim() && !editProdCuts.includes(editProdCutInput.trim())) {
+                                setEditProdCuts((prev) => [...prev, editProdCutInput.trim()]);
+                                setEditProdCutInput('');
+                              }
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="add-cut-btn"
+                          onClick={() => {
+                            if (editProdCutInput.trim() && !editProdCuts.includes(editProdCutInput.trim())) {
+                              setEditProdCuts((prev) => [...prev, editProdCutInput.trim()]);
+                              setEditProdCutInput('');
+                            }
+                          }}
+                        >
+                          <Plus size={14} aria-hidden="true" />
+                          <span>إضافة خيار</span>
+                        </button>
+                      </div>
+
+                      <div className="quick-presets-row">
+                        <span className="presets-label">خيارات تقطيع شائعة للإضافة بنقرة واحدة:</span>
+                        <div className="presets-chips">
+                          {['قطع كباب حلة', 'مكعبات خضار', 'سلق للشوربة', 'شرائح ستيك', 'بفتيك مدقوق', 'شاورما', 'فرم وش واحد', 'فرم وشين', 'سليم بدون تقطيع'].map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              className={`preset-chip-btn ${editProdCuts.includes(preset) ? 'disabled' : ''}`}
+                              disabled={editProdCuts.includes(preset)}
+                              onClick={() => setEditProdCuts((prev) => [...prev, preset])}
+                            >
+                              + {preset}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* PRODUCT-SPECIFIC DISCOUNT SECTION */}
