@@ -69,6 +69,7 @@ export default function AdminDashboard({
 
   // Per-Product Discount Management State
   const [selectedDiscountProdIds, setSelectedDiscountProdIds] = useState([]);
+  const [customDiscountMap, setCustomDiscountMap] = useState({}); // { [productId]: { percent: number, startDate: string, endDate: string } }
   const [discountProdSearch, setDiscountProdSearch] = useState('');
   const [discountCatFilter, setDiscountCatFilter] = useState('all');
   const [batchDiscountPercent, setBatchDiscountPercent] = useState(10);
@@ -255,33 +256,132 @@ export default function AdminDashboard({
     }
   };
 
-  // Per-Product Discount Actions
+  // Per-Product Discount Actions (Supports both Individual custom % and Batch %)
   const handleToggleSelectProduct = (productId) => {
-    setSelectedDiscountProdIds((prev) =>
-      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
-    );
+    setSelectedDiscountProdIds((prev) => {
+      const isCurrentlySelected = prev.includes(productId);
+      if (isCurrentlySelected) {
+        return prev.filter((id) => id !== productId);
+      } else {
+        // Initialize custom discount for this product if not already customized
+        const targetProd = products.find((p) => p.id === productId);
+        setCustomDiscountMap((currMap) => {
+          if (currMap[productId]) return currMap;
+          const initialPct = targetProd?.discount_percent 
+            ? Number(targetProd.discount_percent) 
+            : (Number(batchDiscountPercent) || 10);
+          return {
+            ...currMap,
+            [productId]: {
+              percent: initialPct,
+              startDate: batchDiscountStartDate || '',
+              endDate: batchDiscountEndDate || ''
+            }
+          };
+        });
+        return [...prev, productId];
+      }
+    });
+  };
+
+  const handleCustomDiscountChange = (productId, rawVal) => {
+    const val = Math.max(1, Math.min(90, Number(rawVal) || 0));
+    setCustomDiscountMap((prev) => ({
+      ...prev,
+      [productId]: {
+        ...(prev[productId] || { startDate: batchDiscountStartDate, endDate: batchDiscountEndDate }),
+        percent: val
+      }
+    }));
+  };
+
+  const handleStepCustomDiscount = (productId, delta) => {
+    const current = customDiscountMap[productId]?.percent ?? (Number(batchDiscountPercent) || 10);
+    const nextVal = Math.max(1, Math.min(90, current + delta));
+    handleCustomDiscountChange(productId, nextVal);
   };
 
   const handleSelectAllFiltered = (filteredList) => {
     const ids = filteredList.map((p) => p.id);
     setSelectedDiscountProdIds(ids);
+    setCustomDiscountMap((currMap) => {
+      const nextMap = { ...currMap };
+      filteredList.forEach((p) => {
+        if (!nextMap[p.id]) {
+          nextMap[p.id] = {
+            percent: p.discount_percent ? Number(p.discount_percent) : (Number(batchDiscountPercent) || 10),
+            startDate: batchDiscountStartDate || '',
+            endDate: batchDiscountEndDate || ''
+          };
+        }
+      });
+      return nextMap;
+    });
   };
 
   const handleDeselectAll = () => {
     setSelectedDiscountProdIds([]);
   };
 
-  // Apply discount to selected individual products
+  const handleApplyBatchPctToAllSelected = () => {
+    const pct = Number(batchDiscountPercent) || 10;
+    setCustomDiscountMap((prev) => {
+      const next = { ...prev };
+      selectedDiscountProdIds.forEach((id) => {
+        next[id] = {
+          ...(next[id] || {}),
+          percent: pct,
+          startDate: batchDiscountStartDate || '',
+          endDate: batchDiscountEndDate || ''
+        };
+      });
+      return next;
+    });
+    setDiscountActionFeedback({
+      type: 'info',
+      text: `تم ضبط نسبة ${pct}% لكافة الأصناف المحددة (${selectedDiscountProdIds.length} صنف). اضغط "حفظ وتطبيق الخصومات" بالأسفل لاعتمادها.`
+    });
+    setTimeout(() => setDiscountActionFeedback(null), 3500);
+  };
+
+  // Quick update for products in Section 1 (currently discounted)
+  const handleQuickUpdateActiveDiscount = async (productId, newPct) => {
+    const targetProd = products.find((p) => p.id === productId);
+    if (!targetProd) return;
+    const validatedPct = Math.max(1, Math.min(90, Number(newPct) || 10));
+
+    const updated = {
+      ...targetProd,
+      discount_percent: validatedPct
+    };
+
+    if (onBatchUpdateProducts) {
+      onBatchUpdateProducts([updated]);
+    } else if (onUpdateFullProduct) {
+      onUpdateFullProduct(productId, { discount_percent: validatedPct });
+    }
+
+    try {
+      await supabase
+        .from('products')
+        .update({ discount_percent: validatedPct })
+        .eq('id', productId);
+    } catch (err) {
+      console.warn('Quick update active discount supabase notice:', err);
+    }
+
+    setDiscountActionFeedback({
+      type: 'success',
+      text: `تم تحديث نسبة خصم "${targetProd.name}" إلى ${validatedPct}% فوراً!`
+    });
+    setTimeout(() => setDiscountActionFeedback(null), 3500);
+  };
+
+  // Apply discount to selected individual products (each with its own custom percentage)
   const handleApplyDiscountToSelected = async (e) => {
     if (e) e.preventDefault();
     if (selectedDiscountProdIds.length === 0) {
-      alert('يرجى تحديد منتج واحد على الأقل من القائمة لتطبيق الخصم عليه.');
-      return;
-    }
-
-    const pct = Number(batchDiscountPercent);
-    if (!pct || pct <= 0 || pct > 90) {
-      alert('يرجى إدخال نسبة خصم صحيحة بين 1% و 90%');
+      alert('يرجى تحديد صنف واحد على الأقل من القائمة لتطبيق الخصم عليه.');
       return;
     }
 
@@ -289,12 +389,21 @@ export default function AdminDashboard({
     try {
       const updatedProducts = products
         .filter((p) => selectedDiscountProdIds.includes(p.id))
-        .map((p) => ({
-          ...p,
-          discount_percent: pct,
-          discount_start_date: batchDiscountStartDate || null,
-          discount_end_date: batchDiscountEndDate || null
-        }));
+        .map((p) => {
+          const custom = customDiscountMap[p.id];
+          const pct = custom?.percent !== undefined 
+            ? Number(custom.percent) 
+            : (Number(batchDiscountPercent) || 10);
+          const sDate = (custom?.startDate !== undefined ? custom.startDate : batchDiscountStartDate) || null;
+          const eDate = (custom?.endDate !== undefined ? custom.endDate : batchDiscountEndDate) || null;
+
+          return {
+            ...p,
+            discount_percent: pct,
+            discount_start_date: sDate,
+            discount_end_date: eDate
+          };
+        });
 
       if (onBatchUpdateProducts) {
         onBatchUpdateProducts(updatedProducts);
@@ -307,9 +416,9 @@ export default function AdminDashboard({
             supabase
               .from('products')
               .update({
-                discount_percent: pct,
-                discount_start_date: batchDiscountStartDate || null,
-                discount_end_date: batchDiscountEndDate || null
+                discount_percent: p.discount_percent,
+                discount_start_date: p.discount_start_date,
+                discount_end_date: p.discount_end_date
               })
               .eq('id', p.id)
           )
@@ -321,12 +430,12 @@ export default function AdminDashboard({
       setSelectedDiscountProdIds([]);
       setDiscountActionFeedback({
         type: 'success',
-        text: `تم بنجاح تطبيق خصم ${pct}% على (${updatedProducts.length}) صنف من اللحوم!`
+        text: `تم بنجاح حفظ وتطبيق الخصومات بنسبها المحددة على (${updatedProducts.length}) صنف دفعة واحدة!`
       });
       setTimeout(() => setDiscountActionFeedback(null), 4000);
     } catch (err) {
       console.error('Error applying batch discount:', err);
-      alert('حدث خطأ أثناء تطبيق الخصم: ' + (err.message || ''));
+      alert('حدث خطأ أثناء تطبيق الخصومات: ' + (err.message || ''));
     } finally {
       setIsApplyingDiscounts(false);
     }
@@ -1301,6 +1410,32 @@ export default function AdminDashboard({
                           <span className="disc-new-price tabular-nums">{finalPrice} ج.م / كجم</span>
                         </div>
 
+                        {/* Quick adjust percentage directly */}
+                        <div className="disc-card-quick-edit-row">
+                          <span className="quick-edit-lbl">تعديل النسبة مباشرة:</span>
+                          <div className="quick-edit-stepper">
+                            <button
+                              type="button"
+                              className="stepper-btn-sm"
+                              onClick={() => handleQuickUpdateActiveDiscount(p.id, Math.max(1, pct - 5))}
+                              title="تقليل 5%"
+                              aria-label={`تقليل خصم ${p.name} بنسبة 5%`}
+                            >
+                              -5%
+                            </button>
+                            <span className="current-active-pct tabular-nums">{pct}%</span>
+                            <button
+                              type="button"
+                              className="stepper-btn-sm"
+                              onClick={() => handleQuickUpdateActiveDiscount(p.id, Math.min(90, pct + 5))}
+                              title="زيادة 5%"
+                              aria-label={`زيادة خصم ${p.name} بنسبة 5%`}
+                            >
+                              +5%
+                            </button>
+                          </div>
+                        </div>
+
                         {/* Validity dates info */}
                         <div className="disc-dates-row">
                           <Calendar size={13} aria-hidden="true" />
@@ -1377,7 +1512,25 @@ export default function AdminDashboard({
                       </button>
                     ))}
                   </div>
-                  <span className="field-hint">اختر نسبة من الأزرار أو اكتب النسبة المباشرة لتخفيض سعر الكيلو لكل صنف محدد.</span>
+
+                  {selectedDiscountProdIds.length > 0 && (
+                    <div className="batch-apply-all-action-row">
+                      <button
+                        type="button"
+                        className="batch-apply-to-all-selected-btn"
+                        onClick={handleApplyBatchPctToAllSelected}
+                        title="تطبيق هذه النسبة على كل الأصناف المختارة"
+                      >
+                        <Percent size={14} aria-hidden="true" />
+                        <span>تطبيق {batchDiscountPercent}% كنسبة موحدة على كافة الأصناف المحددة ({selectedDiscountProdIds.length})</span>
+                      </button>
+                      <span className="batch-apply-hint">
+                        أو يمكنك تخصيص نسبة مستقلة لكل صنف من بطاقته بالأسفل دون الحاجة للحفظ المتكرر!
+                      </span>
+                    </div>
+                  )}
+
+                  <span className="field-hint">اختر نسبة عامة للبدء بها، أو عدل نسبة كل صنف بشكل منفصل من بطاقته مباشرة.</span>
                 </div>
 
                 <div className="form-group">
@@ -1469,8 +1622,12 @@ export default function AdminDashboard({
                 {discountPickerFilteredProducts.map((p) => {
                   const isSelected = selectedDiscountProdIds.includes(p.id);
                   const basePrice = Number(p.price_per_kg);
-                  const pct = Number(batchDiscountPercent) || 10;
-                  const previewPrice = Math.round(basePrice * (1 - pct / 100));
+                  const customItem = customDiscountMap[p.id];
+                  const itemPct = customItem?.percent !== undefined
+                    ? Number(customItem.percent)
+                    : (p.discount_percent ? Number(p.discount_percent) : (Number(batchDiscountPercent) || 10));
+                  const previewPrice = Math.round(basePrice * (1 - itemPct / 100));
+                  const savedAmount = Math.max(0, basePrice - previewPrice);
                   const alreadyHasDiscount = Boolean(p.discount_percent && Number(p.discount_percent) > 0);
 
                   return (
@@ -1513,7 +1670,66 @@ export default function AdminDashboard({
                           <span className="base-price">{basePrice} ج.م</span>
                           <span className="preview-arrow">←</span>
                           <span className="new-price">{previewPrice} ج.م</span>
+                          {isSelected && savedAmount > 0 && (
+                            <span className="meta-savings-tag">وفر {savedAmount} ج.م</span>
+                          )}
                         </div>
+
+                        {/* CUSTOM PER-PRODUCT DISCOUNT CONTROLS WHEN SELECTED */}
+                        {isSelected && (
+                          <div
+                            className="card-custom-discount-controls"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          >
+                            <div className="card-discount-input-row">
+                              <span className="card-discount-lbl">نسبة الخصم لهذا الصنف:</span>
+                              <div className="card-discount-stepper">
+                                <button
+                                  type="button"
+                                  className="stepper-btn"
+                                  aria-label={`تقليل نسبة خصم ${p.name}`}
+                                  onClick={() => handleStepCustomDiscount(p.id, -5)}
+                                >
+                                  -
+                                </button>
+                                <div className="stepper-input-wrap">
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max="90"
+                                    value={itemPct}
+                                    onChange={(e) => handleCustomDiscountChange(p.id, e.target.value)}
+                                    className="card-discount-num tabular-nums"
+                                    aria-label={`نسبة الخصم لصنف ${p.name}`}
+                                  />
+                                  <span className="stepper-unit">%</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="stepper-btn"
+                                  aria-label={`زيادة نسبة خصم ${p.name}`}
+                                  onClick={() => handleStepCustomDiscount(p.id, +5)}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="card-quick-pct-chips" aria-label={`نسب سريعة لصنف ${p.name}`}>
+                              {[5, 10, 15, 20, 25, 30].map((chipPct) => (
+                                <button
+                                  key={chipPct}
+                                  type="button"
+                                  className={`card-mini-pct-chip ${itemPct === chipPct ? 'active' : ''}`}
+                                  onClick={() => handleCustomDiscountChange(p.id, chipPct)}
+                                >
+                                  {chipPct}%
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -1531,8 +1747,10 @@ export default function AdminDashboard({
                   <Percent size={18} aria-hidden="true" />
                   <span>
                     {isApplyingDiscounts 
-                      ? 'جاري حفظ الخصم في Supabase…' 
-                      : `تطبيق خصم ${batchDiscountPercent}% على (${selectedDiscountProdIds.length}) صنف محدد الآن`}
+                      ? 'جاري حفظ الخصومات في Supabase…' 
+                      : selectedDiscountProdIds.length === 1
+                        ? `حفظ وتطبيق الخصم على الصنف المحدد الآن`
+                        : `حفظ وتطبيق كافة الخصومات على (${selectedDiscountProdIds.length}) أصناف محددة بنسبها المختلفة دفعة واحدة`}
                   </span>
                 </button>
               </div>
